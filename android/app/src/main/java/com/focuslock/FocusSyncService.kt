@@ -28,7 +28,7 @@ class FocusSyncService : Service() {
         private const val CHANNEL_ID = "focus_lock_sync_channel"
         private const val NOTIFICATION_ID = 1001
 
-        private const val DEFAULT_CLOUD_HOST = "focuslock-studio.onrender.com"
+        private const val DEFAULT_CLOUD_HOST = "focuslock-7pe7.onrender.com"
 
         private var activeWebSocket: WebSocket? = null
 

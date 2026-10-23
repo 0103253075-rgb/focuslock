@@ -63,14 +63,13 @@ jobs:
       - name: Publish Direct Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.4
-          name: "FocusLock v1.2.4 (Cloud 4-Digit Room Sync & Multi-Tenant Studio)"
+          tag_name: v1.2.5
+          name: "FocusLock v1.2.5 (Configured for Live Render Cloud)"
           body: |
-            ### 🚀 FocusLock v1.2.4 Release Updates:
-            - **Cloud 4-Digit Room Sync:** Seamless pairing across the internet via 4-digit codes (e.g. `5821`). No port forwarding or local Wi-Fi pairing required!
-            - **Creator Pro Edition:** Removed hardcoded IP. Added persistent `SharedPreferences` storage for room codes and server hosts.
-            - **Follower Edition:** 100% standalone deep work companion with 25m/45m/60m presets and safety emergency gestures.
-            - **Multi-Tenant Server:** Added isolated room state engine (`rooms = new Map()`) supporting infinite concurrent users on a single cloud deployment.
+            ### 🚀 FocusLock v1.2.5 Release:
+            - **Default Cloud Host Configured:** Automatically connects to your live Render server `focuslock-7pe7.onrender.com`.
+            - **Zero Setup for Followers:** Followers only need to enter their 4-digit code (`5091`)!
+            - **Creator Pro & Follower Editions:** Ready to download.
           files: |
             release_apks/FocusLock-Follower-Edition.apk
             release_apks/FocusLock-Creator-Pro.apk

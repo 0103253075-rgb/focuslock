@@ -261,7 +261,7 @@ class MainActivity : Activity() {
             }
 
             val hostInput = EditText(this).apply {
-                hint = "Leave blank for Cloud (or enter 192.168.x.x)"
+                hint = "Default: focuslock-7pe7.onrender.com (or local IP)"
                 setText(initialHost)
                 setHintTextColor(Color.parseColor("#52525b"))
                 setTextColor(Color.WHITE)
