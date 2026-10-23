@@ -11,6 +11,7 @@
     
     <!-- Persistent background connection to PC -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <!-- Call screening: to detect and mute 1st calls, allowing emergency 2nd calls -->
@@ -52,7 +53,7 @@
             android:name=".FocusSyncService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="dataSync" />
 
         <!-- Call Receiver (Smart Emergency Bypass Filter) -->
         <receiver

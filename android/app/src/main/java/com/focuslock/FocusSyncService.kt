@@ -144,7 +144,7 @@ class FocusSyncService : Service() {
 
         val heartbeat = JSONObject().apply {
             put("type", "DEVICE_HEARTBEAT")
-            put("deviceName", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}")
+            put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL}")
             put("batteryLevel", batteryPct)
             put("isCharging", isCharging)
         }
