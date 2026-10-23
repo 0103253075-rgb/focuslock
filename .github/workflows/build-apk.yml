@@ -28,7 +28,19 @@ jobs:
 
       - name: Build Debug APK
         working-directory: ./android
-        run: gradle assembleDebug --stacktrace
+        run: |
+          set +e
+          gradle assembleDebug --stacktrace 2>&1 | tee ../build.log
+          BUILD_STATUS=${PIPESTATUS[0]}
+          if [ $BUILD_STATUS -ne 0 ]; then
+            git config --global user.name "Build Bot"
+            git config --global user.email "bot@github.com"
+            git checkout -B build-error-log
+            git add ../build.log
+            git commit -m "Capture build error log"
+            git push origin build-error-log --force
+            exit 1
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
