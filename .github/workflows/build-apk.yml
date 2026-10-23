@@ -63,13 +63,14 @@ jobs:
       - name: Publish Direct Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.6
-          name: "FocusLock v1.2.6 (Custom Duration Block & Unlimited Timer)"
+          tag_name: v1.2.7
+          name: "FocusLock v1.2.7 (Crash Fix & Direct Overlay Architecture)"
           body: |
-            ### 🚀 FocusLock v1.2.6 Release:
-            - **Custom Duration Block:** Select any lock duration beyond 90m (e.g. 100m, 120m, 180m, or any custom minutes).
-            - **Pre-Baked Live Cloud Host:** Automatically connected to `focuslock-7pe7.onrender.com`.
-            - **Available on both Laptop Studio Cockpit and Phone App.**
+            ### 🚀 FocusLock v1.2.7 Release:
+            - **CRITICAL CRASH FIX:** Eliminated background service start restrictions on Android 12-14 that caused "App is not responding" ANR crashes.
+            - **Direct WindowManager Overlay Architecture:** Overlay renders safely on Looper.getMainLooper() without launching child background services.
+            - **Custom Duration Timer:** Unlimited time selection (100m, 120m, 180m+).
+            - **Pre-baked Cloud Server:** Directly connects to `focuslock-7pe7.onrender.com`.
           files: |
             release_apks/FocusLock-Follower-Edition.apk
             release_apks/FocusLock-Creator-Pro.apk

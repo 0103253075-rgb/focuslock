@@ -231,17 +231,13 @@ class FocusSyncService : Service() {
                         // Do NOT re-lock the phone.
                         return
                     }
-                    if (!LockOverlayService.isOverlayShowing) {
-                        val lockIntent = Intent(this, LockOverlayService::class.java).apply {
-                            putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, durationMins)
-                            putExtra(LockOverlayService.EXTRA_REASON, reason)
-                        }
-                        startService(lockIntent)
+                    if (!LockOverlayManager.isOverlayShowing) {
+                        val ctx = applicationContext
+                        LockOverlayManager.show(ctx, durationMins, reason)
                     }
                 } else {
                     isLocalUnlocked = false
-                    // Unconditionally dismiss overlay immediately in 0ms
-                    LockOverlayService.dismissNow()
+                    LockOverlayManager.dismiss(applicationContext)
                 }
             }
         } catch (e: Exception) {

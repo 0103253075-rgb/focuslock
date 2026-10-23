@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FocusLock - Official User Guide & Manual</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    @page {
+      size: A4;
+      margin: 16mm 14mm 16mm 14mm;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #18181b;
+      background-color: #ffffff;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+    
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #09090b 0%, #18181b 100%);
+      color: #ffffff;
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border-left: 6px solid #00F0FF;
+    }
+    
+    .logo-badge {
+      display: inline-block;
+      background: rgba(0, 240, 255, 0.15);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      color: #00F0FF;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+    
+    .subtitle {
+      color: #a1a1aa;
+      font-size: 13px;
+    }
+    
+    /* Section Headings */
+    h2 {
+      font-size: 16px;
+      font-weight: 800;
+      color: #09090b;
+      margin: 22px 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #f4f4f5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #18181b;
+      margin: 12px 0 6px 0;
+    }
+    
+    p {
+      margin-bottom: 8px;
+      color: #3f3f46;
+    }
+    
+    /* Links */
+    a {
+      color: #0284c7;
+      text-decoration: underline;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    
+    .btn-link {
+      display: inline-block;
+      background-color: #09090b;
+      color: #00F0FF !important;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 12px;
+      margin: 4px 0;
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+    
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 12px;
+    }
+    
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border: 1px solid #e4e4e7;
+    }
+    
+    th {
+      background-color: #f4f4f5;
+      font-weight: 700;
+      color: #09090b;
+    }
+    
+    tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+    
+    /* Cards & Callouts */
+    .card-grid {
+      display: flex;
+      gap: 14px;
+      margin: 12px 0;
+    }
+    
+    .card {
+      flex: 1;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #e4e4e7;
+      background: #fafafa;
+    }
+    
+    .card.pro {
+      border-color: #00F0FF;
+      background: #f0fdff;
+    }
+    
+    .card-tag {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #0284c7;
+      margin-bottom: 4px;
+    }
+    
+    .steps-box {
+      background-color: #f8fafc;
+      border-left: 4px solid #0284c7;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 10px 0 16px 0;
+    }
+    
+    ol {
+      margin-left: 18px;
+      color: #3f3f46;
+    }
+    
+    li {
+      margin-bottom: 6px;
+      padding-left: 4px;
+    }
+    
+    /* Safety & Privacy Badges */
+    .safety-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 14px 0;
+    }
+    
+    .safety-title {
+      font-weight: 800;
+      color: #991b1b;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    
+    .code-badge {
+      font-family: 'JetBrains Mono', monospace;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    
+    .footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid #e4e4e7;
+      text-align: center;
+      font-size: 11px;
+      color: #71717a;
+    }
+    
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-badge">🛡️ Official Distribution Guide</div>
+    <h1>FocusLock User Manual & Privacy Guide</h1>
+    <div class="subtitle">Complete guide, direct links, and transparent privacy assurance for followers & students</div>
+  </div>
+
+  <!-- Direct Downloads Section -->
+  <h2>📥 1. Direct Download & Access Links</h2>
+  <p>All versions are free, standalone, and ready for instant use on your devices:</p>
+  
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Product</th>
+        <th style="width: 32%;">Target Audience</th>
+        <th style="width: 40%;">Direct One-Click Link</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>🌐 FocusLock Web Studio</strong></td>
+        <td>Laptop Control Cockpit (Works on all browsers: Windows, Mac, iPad)</td>
+        <td>
+          <a href="https://focuslock-7pe7.onrender.com/" target="_blank"><strong>https://focuslock-7pe7.onrender.com/</strong></a>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>📱 Creator Pro Edition (v1.2.6)</strong></td>
+        <td>Professionals & creators locking phone from laptop</td>
+        <td>
+          <a href="https://github.com/0103253075-rgb/focuslock/releases/download/v1.2.6/FocusLock-Creator-Pro.apk" target="_blank" class="btn-link">⚡ Download Creator Pro APK (v1.2.6)</a><br>
+          <small><a href="https://github.com/0103253075-rgb/focuslock/releases/download/v1.2.5/FocusLock-Creator-Pro.apk">Fallback v1.2.5 Direct Link</a></small>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>🎓 Student / Follower Edition (v1.2.6)</strong></td>
+        <td>High school, college & exam students (100% on phone)</td>
+        <td>
+          <a href="https://github.com/0103253075-rgb/focuslock/releases/download/v1.2.6/FocusLock-Follower-Edition.apk" target="_blank" class="btn-link">⚡ Download Student Edition APK (v1.2.6)</a><br>
+          <small><a href="https://github.com/0103253075-rgb/focuslock/releases/download/v1.2.5/FocusLock-Follower-Edition.apk">Fallback v1.2.5 Direct Link</a></small>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>📦 Full GitHub Releases</strong></td>
+        <td>Source code, release logs & all APK versions</td>
+        <td>
+          <a href="https://github.com/0103253075-rgb/focuslock/releases" target="_blank">https://github.com/0103253075-rgb/focuslock/releases</a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Edition Comparison Cards -->
+  <h2>🎯 2. Which Version Is Right For You?</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-tag">🎓 Pure Phone Study</div>
+      <h3>Student Edition</h3>
+      <p><strong>For:</strong> Students studying for exams (UPSC, NEET, JEE, CFA, Finals) or reading in libraries without a laptop.</p>
+      <p><strong>How it works:</strong> Zero setup required. Select 25m, 45m, or 60m right on your phone and tap Start. The screen turns pitch black with your harsh motivational discipline quote.</p>
+      <p><strong>Setup:</strong> 100% on phone. No PC or Wi-Fi needed.</p>
+    </div>
+    <div class="card pro">
+      <div class="card-tag">💻 Laptop Cockpit</div>
+      <h3>Creator Pro Edition</h3>
+      <p><strong>For:</strong> Developers, freelancers, designers, and office workers sitting at a laptop workstation all day.</p>
+      <p><strong>How it works:</strong> Phone stays on your desk. You activate focus sessions, see live countdowns, and check battery levels directly from your laptop browser.</p>
+      <p><strong>Setup:</strong> Pair once via your 4-digit Sync Code over the internet.</p>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- Step-by-Step Guide -->
+  <h2>🚀 3. Step-by-Step Setup Walkthrough</h2>
+
+  <h3>A. Setting Up Student Edition (Phone-Only &bull; 30 Seconds)</h3>
+  <div class="steps-box">
+    <ol>
+      <li><strong>Download & Install:</strong> Tap the <a href="https://github.com/0103253075-rgb/focuslock/releases/download/v1.2.6/FocusLock-Follower-Edition.apk">Student Edition APK link</a> on your Android phone and install.</li>
+      <li><strong>Grant Screen Shield:</strong> Tap <em>"1. Screen Shield (Required)"</em> and allow <em>"Display over other apps"</em> so FocusLock can draw the distraction shield.</li>
+      <li><strong>Choose Duration:</strong> Tap <strong>25m Pomodoro</strong>, <strong>45m Deep</strong>, <strong>60m Ultra</strong>, or tap <strong>Custom</strong> to enter any number of minutes you want (e.g. 100m, 120m, 180m).</li>
+      <li><strong>Begin Lockdown:</strong> Tap <strong>⚡ START FOCUS LOCKDOWN</strong>. The phone locks pitch black until the timer reaches 00:00.</li>
+    </ol>
+  </div>
+
+  <h3>B. Setting Up Creator Pro Edition (Laptop + Phone &bull; 1-Minute Pair)</h3>
+  <div class="steps-box">
+    <ol>
+      <li><strong>Open Laptop Studio:</strong> On your laptop browser (Chrome, Safari, Edge), visit <a href="https://focuslock-7pe7.onrender.com/" target="_blank"><strong>https://focuslock-7pe7.onrender.com/</strong></a>.</li>
+      <li><strong>Note Your Sync Code:</strong> Look at the top bar for your unique 4-digit code (e.g. <span class="code-badge">5091</span>).</li>
+      <li><strong>Install Pro App:</strong> Download and open <a href="https://github.com/0103253075-rgb/focuslock/releases/download/v1.2.6/FocusLock-Creator-Pro.apk">FocusLock Creator Pro</a> on your phone and grant the Screen Shield permission.</li>
+      <li><strong>Enter Sync Code:</strong> Type your 4-digit code (e.g. <span class="code-badge">5091</span>) into the top input box.</li>
+      <li><strong>Verify Website URL:</strong> The second box is pre-filled with <span class="code-badge">focuslock-7pe7.onrender.com</span>. If it is ever blank, simply paste <a href="https://focuslock-7pe7.onrender.com/"><strong>focuslock-7pe7.onrender.com</strong></a>.</li>
+      <li><strong>Pair Instantly:</strong> Tap <strong>⚡ PAIR & CONNECT TO LAPTOP</strong>. The phone connects across the internet!</li>
+      <li><strong>Lock from Laptop:</strong> Select your duration (25m, 45m, 60m, 90m, or click <strong>Custom</strong> for 100m+) and click <strong>ACTIVATE SHIELD</strong>. Your phone locks immediately.</li>
+    </ol>
+  </div>
+
+  <!-- Emergency & Safety Guarantee -->
+  <h2>🔒 4. Safety Guarantee: You Are Never Trapped</h2>
+  <div class="safety-banner">
+    <div class="safety-title">🚨 Real-Life Emergency Controls:</div>
+    <ul style="margin-left: 20px; color: #7f1d1d; font-size: 12px; line-height: 1.6;">
+      <li><strong>Emergency Master PIN (<span class="code-badge">884422</span>):</strong> Tap anywhere on the locked black screen <strong>5 times rapidly</strong> to bring up the keypad. Enter <strong>884422</strong> to dismiss the shield and return to your home screen instantly.</li>
+      <li><strong>Smart 2nd-Call Bypass Filter:</strong> Normal 1st calls are muted so they don't break your focus. However, if any contact (parents, doctor, boss) calls a <strong>second time within 5 minutes</strong>, your phone automatically rings at full volume for safety.</li>
+    </ul>
+  </div>
+
+  <!-- Privacy & Permissions Breakdown -->
+  <h2>🛡️ 5. Privacy, Permissions & What Happens to Your Data</h2>
+  <p>We believe in 100% transparency. FocusLock does <strong>NOT</strong> collect, sell, or monitor your personal life. Here is the exact reason for every permission:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Permission</th>
+        <th style="width: 45%;">Why It Is Needed</th>
+        <th style="width: 30%;">Is Data Uploaded or Saved?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Display Over Other Apps ("Screen Shield")</strong></td>
+        <td>Draws a pure AMOLED black layer over distracting apps (Instagram, YouTube, Reddit) during active focus blocks.</td>
+        <td><strong>NO.</strong> It cannot record your screen, view your camera, or take screenshots. It only draws a black overlay.</td>
+      </tr>
+      <tr>
+        <td><strong>Do Not Disturb (DND Access)</strong></td>
+        <td>Silences pop-up notification sounds and vibration buzzes during active focus sessions.</td>
+        <td><strong>NO.</strong> It cannot read the text or content of your private messages or notifications.</td>
+      </tr>
+      <tr>
+        <td><strong>Emergency Call Screening</strong></td>
+        <td>Checks if the same incoming phone number rings twice within 5 minutes to trigger the emergency bypass.</td>
+        <td><strong>NO.</strong> Handled strictly inside phone local RAM. No contact books, call logs, or recordings are sent to any server.</td>
+      </tr>
+      <tr>
+        <td><strong>Battery & Charging Status</strong></td>
+        <td>Displays your phone's battery percentage on your laptop dashboard so you know when to plug it in.</td>
+        <td>Transmitted strictly in real-time to your own private session room and erased immediately after.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px; margin-top: 10px;">
+    <strong style="color: #166534;">✅ Zero-Tracking Guarantee:</strong>
+    <span style="color: #15803d; font-size: 12px;">No account creation required &bull; No passwords stored &bull; No advertising trackers &bull; No analytics telemetry &bull; Zero selling of user habits.</span>
+  </div>
+
+  <div class="footer">
+    FocusLock Studio &copy; 2026 &bull; Pure Wireless Remote Anti-Distraction Cockpit &bull; Built for High-Performance Deep Work
+  </div>
+
+</body>
+</html>
