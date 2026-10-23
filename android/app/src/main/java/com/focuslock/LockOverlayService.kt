@@ -29,6 +29,9 @@ class LockOverlayService : Service() {
     private var countDownTimer: CountDownTimer? = null
     private var tapCount = 0
     private var lastTapTime = 0L
+    private var savedRingerMode: Int = AudioManager.RINGER_MODE_NORMAL
+    private var savedRingVol: Int = 5
+    private var savedNotifVol: Int = 5
 
     companion object {
         const val EXTRA_DURATION_MINUTES = "extra_duration_minutes"
@@ -57,6 +60,27 @@ class LockOverlayService : Service() {
         if (isOverlayShowing) return
 
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // 1. Save and apply TOTAL SILENCE
+        try {
+            savedRingerMode = audioManager.ringerMode
+            savedRingVol = audioManager.getStreamVolume(AudioManager.STREAM_RING)
+            savedNotifVol = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
+
+            // Engage Do Not Disturb (Priority mode: silences all alerts & notifications)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notifManager.isNotificationPolicyAccessGranted) {
+                notifManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+            }
+
+            // Force silent ringer and mute notification/system channels
+            audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+            audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 0, 0)
+            audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -66,12 +90,16 @@ class LockOverlayService : Service() {
             else
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.TRANSLUCENT
         )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
 
         // Programmatic AMOLED black layout
         val container = LinearLayout(this).apply {
@@ -79,6 +107,17 @@ class LockOverlayService : Service() {
             gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor("#09090b"))
             setPadding(60, 60, 60, 60)
+
+            // Hide system status and navigation bars completely
+            @Suppress("DEPRECATION")
+            systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
 
             // 5-Tap Emergency Escape Hatch
             setOnClickListener {
@@ -178,6 +217,23 @@ class LockOverlayService : Service() {
     private fun removeOverlay() {
         countDownTimer?.cancel()
         countDownTimer = null
+
+        // Restore sound and DND settings
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            audioManager.ringerMode = savedRingerMode
+            audioManager.setStreamVolume(AudioManager.STREAM_RING, savedRingVol, 0)
+            audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedNotifVol, 0)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notifManager.isNotificationPolicyAccessGranted) {
+                notifManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         if (overlayView != null && windowManager != null) {
             try {
                 windowManager?.removeView(overlayView)

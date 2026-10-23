@@ -44,7 +44,8 @@ class EmergencyCallReceiver : BroadcastReceiver() {
                         // 🚨 EMERGENCY BYPASS: Called twice within 5 mins!
                         Log.i(TAG, "EMERGENCY: Repeat call from $incomingNumber. Unmuting ringer aloud!")
                         
-                        // Restore ringer to audible volume
+                        // Restore ringer mode to normal and crank up volume
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
                         val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
                         audioManager.setStreamVolume(AudioManager.STREAM_RING, maxVol, 0)
                         
@@ -57,7 +58,8 @@ class EmergencyCallReceiver : BroadcastReceiver() {
                             previousRingerVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
                         }
                         
-                        // Mute ringer
+                        // Mute ringer completely
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
                         audioManager.setStreamVolume(AudioManager.STREAM_RING, 0, 0)
                         
                         // Record this caller's timestamp
