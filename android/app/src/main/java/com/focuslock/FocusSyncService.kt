@@ -129,19 +129,17 @@ class FocusSyncService : Service() {
                 val durationMins = state.optInt("sessionDurationMinutes", 45)
                 val reason = state.optString("lockReason", "Focus Session")
 
-                if (isLocked && !LockOverlayService.isOverlayShowing) {
-                    // Activate Phone Lock Overlay
-                    val lockIntent = Intent(this, LockOverlayService::class.java).apply {
-                        putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, durationMins)
-                        putExtra(LockOverlayService.EXTRA_REASON, reason)
+                if (isLocked) {
+                    if (!LockOverlayService.isOverlayShowing) {
+                        val lockIntent = Intent(this, LockOverlayService::class.java).apply {
+                            putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, durationMins)
+                            putExtra(LockOverlayService.EXTRA_REASON, reason)
+                        }
+                        startService(lockIntent)
                     }
-                    startService(lockIntent)
-                } else if (!isLocked && LockOverlayService.isOverlayShowing) {
-                    // Deactivate Phone Lock Overlay
-                    val unlockIntent = Intent(this, LockOverlayService::class.java).apply {
-                        action = LockOverlayService.ACTION_UNLOCK
-                    }
-                    startService(unlockIntent)
+                } else {
+                    // Unconditionally dismiss overlay immediately in 0ms
+                    LockOverlayService.dismissNow()
                 }
             }
         } catch (e: Exception) {

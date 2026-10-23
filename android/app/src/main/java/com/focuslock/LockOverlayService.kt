@@ -11,46 +11,60 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.CountDownTimer
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 
-/**
- * Safe Floating Focus Overlay:
- * - Covers screen with an AMOLED pitch-black focus interface.
- * - Hardware Fail-safe: Auto-unlocks independently when time expires.
- * - Emergency Escape Hatch: Tap 5 times to reveal Emergency Master PIN.
- */
 class LockOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
-    private var overlayView: View? = null
+    private var overlayContainer: LinearLayout? = null
     private var countDownTimer: CountDownTimer? = null
-    private var tapCount = 0
-    private var lastTapTime = 0L
     private var savedRingerMode: Int = AudioManager.RINGER_MODE_NORMAL
     private var savedRingVol: Int = 5
     private var savedNotifVol: Int = 5
 
+    // In-overlay PIN state
+    private var enteredPin = StringBuilder()
+    private lateinit var pinDotsText: TextView
+    private lateinit var normalLockLayout: LinearLayout
+    private lateinit var pinPadLayout: LinearLayout
+
     companion object {
         const val EXTRA_DURATION_MINUTES = "extra_duration_minutes"
         const val EXTRA_REASON = "extra_reason"
-        const val ACTION_UNLOCK = "com.focuslock.ACTION_UNLOCK"
+        const val MASTER_PIN = "884422"
+
+        @Volatile
+        var currentInstance: LockOverlayService? = null
         var isOverlayShowing = false
+
+        /**
+         * Instant dismiss called from WebSocket sync or PIN unlock
+         */
+        fun dismissNow() {
+            android.os.Handler(Looper.getMainLooper()).post {
+                currentInstance?.removeOverlay()
+                currentInstance?.stopSelf()
+                currentInstance = null
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_UNLOCK) {
-            removeOverlay()
-            stopSelf()
-            return START_NOT_STICKY
-        }
+    override fun onCreate() {
+        super.onCreate()
+        currentInstance = this
+    }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        currentInstance = this
         val durationMinutes = intent?.getIntExtra(EXTRA_DURATION_MINUTES, 45) ?: 45
         val reason = intent?.getStringExtra(EXTRA_REASON) ?: "Deep Focus"
 
@@ -65,18 +79,16 @@ class LockOverlayService : Service() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // 1. Save and apply TOTAL SILENCE
+        // 1. Save and apply Total Silence
         try {
             savedRingerMode = audioManager.ringerMode
             savedRingVol = audioManager.getStreamVolume(AudioManager.STREAM_RING)
             savedNotifVol = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
 
-            // Engage Do Not Disturb (Priority mode: silences all alerts & notifications)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notifManager.isNotificationPolicyAccessGranted) {
                 notifManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
 
-            // Force silent ringer and mute notification/system channels
             audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
             audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 0, 0)
             audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)
@@ -103,14 +115,13 @@ class LockOverlayService : Service() {
             layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
-        // Programmatic AMOLED black layout
-        val container = LinearLayout(this).apply {
+        // Master Container
+        overlayContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor("#09090b"))
-            setPadding(60, 60, 60, 60)
+            setPadding(40, 60, 40, 40)
 
-            // Hide system status and navigation bars completely
             @Suppress("DEPRECATION")
             systemUiVisibility = (
                 View.SYSTEM_UI_FLAG_FULLSCREEN or
@@ -120,85 +131,179 @@ class LockOverlayService : Service() {
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             )
-
-            // 5-Tap Emergency Escape Hatch
-            setOnClickListener {
-                val now = System.currentTimeMillis()
-                if (now - lastTapTime < 800) {
-                    tapCount++
-                } else {
-                    tapCount = 1
-                }
-                lastTapTime = now
-
-                if (tapCount >= 5) {
-                    tapCount = 0
-                    val pinIntent = Intent(this@LockOverlayService, EmergencyPinActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    }
-                    startActivity(pinIntent)
-                }
-            }
         }
 
-        // Lock Icon Text
+        // ==========================================
+        // 1. NORMAL LOCK VIEW
+        // ==========================================
+        normalLockLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
         val iconText = TextView(this).apply {
             text = "🔒"
             textSize = 54f
             gravity = Gravity.CENTER
         }
 
-        // Title
         val titleText = TextView(this).apply {
             text = "FOCUS LOCKDOWN ACTIVE"
             textSize = 18f
             setTextColor(Color.parseColor("#00F0FF"))
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 30, 0, 10)
+            setPadding(0, 20, 0, 10)
         }
 
-        // Timer Display
         val timerText = TextView(this).apply {
             text = "${durationMinutes}:00"
-            textSize = 48f
+            textSize = 52f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
             setPadding(0, 10, 0, 20)
         }
 
-        // Emotional Accountability Prompt
         val quoteText = TextView(this).apply {
-            text = "Did you make your parents proud today?"
-            textSize = 15f
+            text = "\"Did you make your parents proud today?\""
+            textSize = 16f
             setTextColor(Color.parseColor("#f43f5e"))
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 30)
+            setPadding(0, 10, 0, 25)
         }
 
-        // Emergency Notice
-        val callNoticeText = TextView(this).apply {
-            text = "🛡️ Emergency Bypass:\nCalls are muted unless someone rings twice within 5 minutes.\n\n(Tap screen 5 times for emergency Master PIN)"
+        val emergencyBypassButton = Button(this).apply {
+            text = "🔑 Emergency PIN Unlock"
+            setBackgroundColor(Color.parseColor("#18181b"))
+            setTextColor(Color.parseColor("#a1a1aa"))
+            textSize = 12f
+            setPadding(30, 20, 30, 20)
+            setOnClickListener {
+                enteredPin.clear()
+                updatePinDisplay()
+                normalLockLayout.visibility = View.GONE
+                pinPadLayout.visibility = View.VISIBLE
+            }
+        }
+
+        normalLockLayout.addView(iconText)
+        normalLockLayout.addView(titleText)
+        normalLockLayout.addView(timerText)
+        normalLockLayout.addView(quoteText)
+        normalLockLayout.addView(emergencyBypassButton)
+
+        // ==========================================
+        // 2. IN-OVERLAY PIN PAD VIEW (Fail-safe)
+        // ==========================================
+        pinPadLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val pinTitle = TextView(this).apply {
+            text = "Emergency Master Unlock"
+            textSize = 20f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 8)
+        }
+
+        val pinDesc = TextView(this).apply {
+            text = "Enter Master PIN (Default: 884422)"
             textSize = 12f
             setTextColor(Color.parseColor("#71717a"))
             gravity = Gravity.CENTER
-            setLineSpacing(6f, 1f)
+            setPadding(0, 0, 0, 20)
         }
 
-        container.addView(iconText)
-        container.addView(titleText)
-        container.addView(timerText)
-        container.addView(quoteText)
-        container.addView(callNoticeText)
+        pinDotsText = TextView(this).apply {
+            text = "_ _ _ _ _ _"
+            textSize = 28f
+            typeface = Typeface.MONOSPACE
+            setTextColor(Color.parseColor("#00F0FF"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 25)
+        }
 
-        overlayView = container
-        windowManager?.addView(overlayView, layoutParams)
+        pinPadLayout.addView(pinTitle)
+        pinPadLayout.addView(pinDesc)
+        pinPadLayout.addView(pinDotsText)
+
+        // Numeric Keypad Grid (Rows 1-3, 4-6, 7-9, Cancel/0/Del)
+        val rows = arrayOf(
+            arrayOf("1", "2", "3"),
+            arrayOf("4", "5", "6"),
+            arrayOf("7", "8", "9"),
+            arrayOf("BACK", "0", "CLEAR")
+        )
+
+        for (row in rows) {
+            val rowLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, 10) }
+            }
+
+            for (btnText in row) {
+                val btn = Button(this).apply {
+                    text = btnText
+                    textSize = 18f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(if (btnText == "BACK" || btnText == "CLEAR") Color.parseColor("#27272a") else Color.parseColor("#18181b"))
+                    layoutParams = LinearLayout.LayoutParams(180, 140).apply {
+                        setMargins(8, 0, 8, 0)
+                    }
+                    setOnClickListener {
+                        when (btnText) {
+                            "BACK" -> {
+                                pinPadLayout.visibility = View.GONE
+                                normalLockLayout.visibility = View.VISIBLE
+                            }
+                            "CLEAR" -> {
+                                if (enteredPin.isNotEmpty()) enteredPin.deleteCharAt(enteredPin.length - 1)
+                                updatePinDisplay()
+                            }
+                            else -> {
+                                if (enteredPin.length < 6) {
+                                    enteredPin.append(btnText)
+                                    updatePinDisplay()
+                                    if (enteredPin.length == 6) {
+                                        checkPinAndUnlock()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                rowLayout.addView(btn)
+            }
+            pinPadLayout.addView(rowLayout)
+        }
+
+        overlayContainer?.addView(normalLockLayout)
+        overlayContainer?.addView(pinPadLayout)
+
+        windowManager?.addView(overlayContainer, layoutParams)
         isOverlayShowing = true
         EmergencyCallReceiver.isFocusLockActive = true
 
-        // Hardware Fail-Safe Timer (Counts down on the phone independently)
+        // Independent Hardware Timer
         val totalMillis = durationMinutes * 60 * 1000L
         countDownTimer = object : CountDownTimer(totalMillis, 1000) {
             override fun onTick(millisUntilFinished: Long) {
@@ -208,19 +313,37 @@ class LockOverlayService : Service() {
             }
 
             override fun onFinish() {
-                // Auto-unlock fail-safe
-                Toast.makeText(this@LockOverlayService, "Focus Session Complete! Unlocked safely.", Toast.LENGTH_LONG).show()
-                removeOverlay()
-                stopSelf()
+                Toast.makeText(this@LockOverlayService, "⏰ Focus session ended! Phone safely unlocked.", Toast.LENGTH_LONG).show()
+                dismissNow()
             }
         }.start()
     }
 
-    private fun removeOverlay() {
+    private fun updatePinDisplay() {
+        val len = enteredPin.length
+        val sb = StringBuilder()
+        for (i in 0 until 6) {
+            if (i < len) sb.append("• ")
+            else sb.append("_ ")
+        }
+        pinDotsText.text = sb.toString().trim()
+    }
+
+    private fun checkPinAndUnlock() {
+        if (enteredPin.toString() == MASTER_PIN) {
+            Toast.makeText(this, "🔑 Master PIN Verified. Unlocking phone!", Toast.LENGTH_SHORT).show()
+            dismissNow()
+        } else {
+            Toast.makeText(this, "Incorrect PIN! Try 884422", Toast.LENGTH_SHORT).show()
+            enteredPin.clear()
+            updatePinDisplay()
+        }
+    }
+
+    fun removeOverlay() {
         countDownTimer?.cancel()
         countDownTimer = null
 
-        // Restore sound and DND settings
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val notifManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -236,16 +359,15 @@ class LockOverlayService : Service() {
             e.printStackTrace()
         }
 
-        if (overlayView != null && windowManager != null) {
+        if (overlayContainer != null && windowManager != null) {
             try {
-                windowManager?.removeView(overlayView)
-            } catch (e: Exception) {
-                // View already detached
-            }
-            overlayView = null
+                windowManager?.removeView(overlayContainer)
+            } catch (e: Exception) {}
+            overlayContainer = null
         }
         isOverlayShowing = false
         EmergencyCallReceiver.isFocusLockActive = false
+        currentInstance = null
     }
 
     override fun onDestroy() {
