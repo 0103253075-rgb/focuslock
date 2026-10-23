@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.focuslock">
+
+    <!-- Essential Safe Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- Required to display safe focus overlay over all distracting apps -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    
+    <!-- Persistent background connection to PC -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Call screening: to detect and mute 1st calls, allowing emergency 2nd calls -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@android:drawable/ic_lock_lock"
+        android:label="FocusLock"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FocusLock">
+
+        <!-- Main Configuration Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Emergency Pin Keypad Activity (Accessible if user taps overlay 5 times) -->
+        <activity
+            android:name=".EmergencyPinActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FocusLock.Dialog" />
+
+        <!-- Lock Overlay Service (Draws the AMOLED black lock screen) -->
+        <service
+            android:name=".LockOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Persistent Wireless Bridge Service -->
+        <service
+            android:name=".FocusSyncService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <!-- Call Receiver (Smart Emergency Bypass Filter) -->
+        <receiver
+            android:name=".EmergencyCallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>

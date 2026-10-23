@@ -1,0 +1,182 @@
+package com.focuslock
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Build
+import android.os.IBinder
+import android.util.Log
+import okhttp3.*
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
+/**
+ * Background Foreground Service:
+ * - Connects wirelessly to laptop WebSocket server.
+ * - Listens for LOCK / UNLOCK commands.
+ * - Reports device battery and connectivity.
+ */
+class FocusSyncService : Service() {
+
+    companion object {
+        private const val TAG = "FocusLock_Sync"
+        private const val CHANNEL_ID = "focus_lock_sync_channel"
+        private const val NOTIFICATION_ID = 1001
+
+        private var activeWebSocket: WebSocket? = null
+
+        fun sendCallEvent(number: String, isRepeatCaller: Boolean, action: String) {
+            try {
+                val json = JSONObject().apply {
+                    put("type", "CALL_EVENT")
+                    put("callerNumber", number)
+                    put("isRepeatCaller", isRepeatCaller)
+                    put("action", action)
+                }
+                activeWebSocket?.send(json.toString())
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send call event over WS", e)
+            }
+        }
+    }
+
+    private var client: OkHttpClient? = null
+    private var serverUrl: String = "ws://192.168.137.1:4000"
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, buildNotification("FocusLock Wireless Sync Active"))
+        setupWebSocketClient()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val customIp = intent?.getStringExtra("server_ip")
+        if (!customIp.isNullOrEmpty()) {
+            serverUrl = "ws://$customIp:4000"
+            connectWebSocket()
+        }
+        return START_STICKY
+    }
+
+    private fun setupWebSocketClient() {
+        client = OkHttpClient.Builder()
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .build()
+        connectWebSocket()
+    }
+
+    private fun connectWebSocket() {
+        try {
+            val request = Request.Builder().url(serverUrl).build()
+            client?.newWebSocket(request, object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    Log.i(TAG, "Connected to Laptop Sync Server at $serverUrl")
+                    activeWebSocket = webSocket
+                    sendHeartbeat(webSocket)
+                }
+
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    handleIncomingServerMessage(text)
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    activeWebSocket = null
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    Log.w(TAG, "Sync server disconnected, retrying in 4s...")
+                    activeWebSocket = null
+                    // Reconnect in 4 seconds
+                    android.os.Handler(mainLooper).postDelayed({ connectWebSocket() }, 4000)
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Connection error: ${e.message}")
+        }
+    }
+
+    private fun handleIncomingServerMessage(jsonString: String) {
+        try {
+            val root = JSONObject(jsonString)
+            if (root.optString("type") == "STATE_UPDATE") {
+                val state = root.getJSONObject("state")
+                val isLocked = state.getBoolean("isLocked")
+                val durationMins = state.optInt("sessionDurationMinutes", 45)
+                val reason = state.optString("lockReason", "Focus Session")
+
+                if (isLocked && !LockOverlayService.isOverlayShowing) {
+                    // Activate Phone Lock Overlay
+                    val lockIntent = Intent(this, LockOverlayService::class.java).apply {
+                        putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, durationMins)
+                        putExtra(LockOverlayService.EXTRA_REASON, reason)
+                    }
+                    startService(lockIntent)
+                } else if (!isLocked && LockOverlayService.isOverlayShowing) {
+                    // Deactivate Phone Lock Overlay
+                    val unlockIntent = Intent(this, LockOverlayService::class.java).apply {
+                        action = LockOverlayService.ACTION_UNLOCK
+                    }
+                    startService(unlockIntent)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling message", e)
+        }
+    }
+
+    private fun sendHeartbeat(webSocket: WebSocket) {
+        val batteryStatus: Intent? = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: 85
+        val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: 100
+        val batteryPct = (level * 100 / scale.toFloat()).toInt()
+
+        val status: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging: Boolean = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == BatteryManager.BATTERY_STATUS_FULL
+
+        val heartbeat = JSONObject().apply {
+            put("type", "DEVICE_HEARTBEAT")
+            put("deviceName", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}")
+            put("batteryLevel", batteryPct)
+            put("isCharging", isCharging)
+        }
+        webSocket.send(heartbeat.toString())
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "FocusLock Wireless Sync",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(text: String): Notification {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("FocusLock")
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+                .setContentTitle("FocusLock")
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .build()
+        }
+    }
+}

@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">FocusLock</string>
+    <style name="Theme.FocusLock" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#09090b</item>
+        <item name="android:statusBarColor">#09090b</item>
+    </style>
+    <style name="Theme.FocusLock.Dialog" parent="android:Theme.Material.Dialog.NoActionBar">
+        <item name="android:windowBackground">#09090b</item>
+    </style>
+</resources>

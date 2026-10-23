@@ -1,0 +1,17 @@
+{
+  "name": "focuslock-server",
+  "version": "1.0.0",
+  "description": "Real-time wireless sync bridge between PC dashboard and Android mobile",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0",
+    "qrcode": "^1.5.4"
+  }
+}
