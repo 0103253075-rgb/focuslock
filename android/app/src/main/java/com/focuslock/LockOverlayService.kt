@@ -19,6 +19,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import java.util.Locale
 
 class LockOverlayService : Service() {
 
@@ -30,10 +31,10 @@ class LockOverlayService : Service() {
     private var savedNotifVol: Int = 5
 
     // In-overlay PIN state
-    private var enteredPin = StringBuilder()
-    private lateinit var pinDotsText: TextView
-    private lateinit var normalLockLayout: LinearLayout
-    private lateinit var pinPadLayout: LinearLayout
+    private val enteredPin = StringBuilder()
+    private var pinDotsText: TextView? = null
+    private var normalLockLayout: LinearLayout? = null
+    private var pinPadLayout: LinearLayout? = null
 
     companion object {
         const val EXTRA_DURATION_MINUTES = "extra_duration_minutes"
@@ -49,8 +50,12 @@ class LockOverlayService : Service() {
          */
         fun dismissNow() {
             android.os.Handler(Looper.getMainLooper()).post {
-                currentInstance?.removeOverlay()
-                currentInstance?.stopSelf()
+                try {
+                    currentInstance?.removeOverlay()
+                    currentInstance?.stopSelf()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 currentInstance = null
             }
         }
@@ -136,7 +141,7 @@ class LockOverlayService : Service() {
         // ==========================================
         // 1. NORMAL LOCK VIEW
         // ==========================================
-        normalLockLayout = LinearLayout(this).apply {
+        val normalLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(
@@ -144,6 +149,7 @@ class LockOverlayService : Service() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
+        normalLockLayout = normalLayout
 
         val iconText = TextView(this).apply {
             text = "🔒"
@@ -185,23 +191,23 @@ class LockOverlayService : Service() {
             textSize = 12f
             setPadding(30, 20, 30, 20)
             setOnClickListener {
-                enteredPin.clear()
+                enteredPin.setLength(0)
                 updatePinDisplay()
-                normalLockLayout.visibility = View.GONE
-                pinPadLayout.visibility = View.VISIBLE
+                normalLockLayout?.visibility = View.GONE
+                pinPadLayout?.visibility = View.VISIBLE
             }
         }
 
-        normalLockLayout.addView(iconText)
-        normalLockLayout.addView(titleText)
-        normalLockLayout.addView(timerText)
-        normalLockLayout.addView(quoteText)
-        normalLockLayout.addView(emergencyBypassButton)
+        normalLayout.addView(iconText)
+        normalLayout.addView(titleText)
+        normalLayout.addView(timerText)
+        normalLayout.addView(quoteText)
+        normalLayout.addView(emergencyBypassButton)
 
         // ==========================================
         // 2. IN-OVERLAY PIN PAD VIEW (Fail-safe)
         // ==========================================
-        pinPadLayout = LinearLayout(this).apply {
+        val pinLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             visibility = View.GONE
@@ -210,6 +216,7 @@ class LockOverlayService : Service() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
+        pinPadLayout = pinLayout
 
         val pinTitle = TextView(this).apply {
             text = "Emergency Master Unlock"
@@ -221,14 +228,14 @@ class LockOverlayService : Service() {
         }
 
         val pinDesc = TextView(this).apply {
-            text = "Enter Master PIN (Default: 884422)"
+            text = "Enter Master PIN (884422)"
             textSize = 12f
             setTextColor(Color.parseColor("#71717a"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 20)
         }
 
-        pinDotsText = TextView(this).apply {
+        val dotsView = TextView(this).apply {
             text = "_ _ _ _ _ _"
             textSize = 28f
             typeface = Typeface.MONOSPACE
@@ -236,17 +243,18 @@ class LockOverlayService : Service() {
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 25)
         }
+        pinDotsText = dotsView
 
-        pinPadLayout.addView(pinTitle)
-        pinPadLayout.addView(pinDesc)
-        pinPadLayout.addView(pinDotsText)
+        pinLayout.addView(pinTitle)
+        pinLayout.addView(pinDesc)
+        pinLayout.addView(dotsView)
 
-        // Numeric Keypad Grid (Rows 1-3, 4-6, 7-9, Cancel/0/Del)
+        // Numeric Keypad Grid
         val rows = arrayOf(
             arrayOf("1", "2", "3"),
             arrayOf("4", "5", "6"),
             arrayOf("7", "8", "9"),
-            arrayOf("BACK", "0", "CLEAR")
+            arrayOf("BACK", "0", "DEL")
         )
 
         for (row in rows) {
@@ -265,18 +273,20 @@ class LockOverlayService : Service() {
                     textSize = 18f
                     typeface = Typeface.DEFAULT_BOLD
                     setTextColor(Color.WHITE)
-                    setBackgroundColor(if (btnText == "BACK" || btnText == "CLEAR") Color.parseColor("#27272a") else Color.parseColor("#18181b"))
+                    setBackgroundColor(if (btnText == "BACK" || btnText == "DEL") Color.parseColor("#27272a") else Color.parseColor("#18181b"))
                     layoutParams = LinearLayout.LayoutParams(180, 140).apply {
                         setMargins(8, 0, 8, 0)
                     }
                     setOnClickListener {
                         when (btnText) {
                             "BACK" -> {
-                                pinPadLayout.visibility = View.GONE
-                                normalLockLayout.visibility = View.VISIBLE
+                                pinPadLayout?.visibility = View.GONE
+                                normalLockLayout?.visibility = View.VISIBLE
                             }
-                            "CLEAR" -> {
-                                if (enteredPin.isNotEmpty()) enteredPin.deleteCharAt(enteredPin.length - 1)
+                            "DEL" -> {
+                                if (enteredPin.isNotEmpty()) {
+                                    enteredPin.delete(enteredPin.length - 1, enteredPin.length)
+                                }
                                 updatePinDisplay()
                             }
                             else -> {
@@ -293,23 +303,23 @@ class LockOverlayService : Service() {
                 }
                 rowLayout.addView(btn)
             }
-            pinPadLayout.addView(rowLayout)
+            pinLayout.addView(rowLayout)
         }
 
-        overlayContainer?.addView(normalLockLayout)
-        overlayContainer?.addView(pinPadLayout)
+        overlayContainer?.addView(normalLayout)
+        overlayContainer?.addView(pinLayout)
 
         windowManager?.addView(overlayContainer, layoutParams)
         isOverlayShowing = true
         EmergencyCallReceiver.isFocusLockActive = true
 
-        // Independent Hardware Timer
+        // Independent Hardware Countdown Timer
         val totalMillis = durationMinutes * 60 * 1000L
         countDownTimer = object : CountDownTimer(totalMillis, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val mins = (millisUntilFinished / 1000) / 60
                 val secs = (millisUntilFinished / 1000) % 60
-                timerText.text = String.format("%02d:%02d", mins, secs)
+                timerText.text = String.format(Locale.US, "%02d:%02d", mins, secs)
             }
 
             override fun onFinish() {
@@ -326,7 +336,7 @@ class LockOverlayService : Service() {
             if (i < len) sb.append("• ")
             else sb.append("_ ")
         }
-        pinDotsText.text = sb.toString().trim()
+        pinDotsText?.text = sb.toString().trim()
     }
 
     private fun checkPinAndUnlock() {
@@ -335,7 +345,7 @@ class LockOverlayService : Service() {
             dismissNow()
         } else {
             Toast.makeText(this, "Incorrect PIN! Try 884422", Toast.LENGTH_SHORT).show()
-            enteredPin.clear()
+            enteredPin.setLength(0)
             updatePinDisplay()
         }
     }
