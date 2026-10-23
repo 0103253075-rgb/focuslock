@@ -76,14 +76,27 @@ export function App() {
   const countdownIntervalRef = useRef<any>(null);
   const lastTapTimeRef = useRef<number>(0);
 
-  // Dynamically resolve server host based on current URL (so it works on localhost:4000, localhost:3000, LAN IP, or tunnel)
+  // 4-Digit Room Code resolution
+  const [roomCode] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'local';
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('room');
+    if (fromUrl && fromUrl.length >= 4) return fromUrl.toUpperCase();
+    const stored = localStorage.getItem('focuslock_room');
+    if (stored && stored.length >= 4) return stored.toUpperCase();
+    const generated = Math.floor(1000 + Math.random() * 9000).toString();
+    localStorage.setItem('focuslock_room', generated);
+    return generated;
+  });
+
+  // Dynamically resolve server host based on current URL
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
   let targetHost = typeof window !== 'undefined' ? window.location.host : 'localhost:4000';
   if (typeof window !== 'undefined' && window.location.port === '3000') {
     targetHost = `${window.location.hostname}:4000`;
   }
   const SERVER_URL = `${isHttps ? 'https:' : 'http:'}//${targetHost}`;
-  const WS_URL = `${isHttps ? 'wss:' : 'ws:'}//${targetHost}`;
+  const WS_URL = `${isHttps ? 'wss:' : 'ws:'}//${targetHost}/ws?room=${roomCode}&role=${isPhoneMode ? 'phone' : 'dashboard'}`;
 
   // Connect WebSocket
   useEffect(() => {
@@ -182,7 +195,7 @@ export function App() {
   const handleOpenPairModal = async () => {
     setShowPairModal(true);
     try {
-      const res = await fetch(`${SERVER_URL}/api/pair-qr`);
+      const res = await fetch(`${SERVER_URL}/api/pair-qr?room=${roomCode}`);
       const data = await res.json();
       if (data.qr) {
         setPairQrData(data.qr);
@@ -201,6 +214,7 @@ export function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          room: roomCode,
           durationMinutes: duration,
           reason: sessionReason
         })
@@ -217,6 +231,7 @@ export function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          room: roomCode,
           reason: typedConfirmation || 'Early unlock confirmed'
         })
       });
@@ -230,7 +245,9 @@ export function App() {
   const handleEmergencyUnlock = async () => {
     try {
       await fetch(`${SERVER_URL}/api/emergency-unlock`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: roomCode })
       });
       setShowFrictionModal(false);
     } catch (err) {
@@ -472,6 +489,12 @@ export function App() {
                 <WifiOff className="w-3.5 h-3.5" /> Phone Not Paired Yet
               </span>
             )}
+          </div>
+
+          {/* Pair Code Display */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-xs shadow-sm shadow-cyan-500/10">
+            <span className="text-zinc-400 font-mono text-[11px]">Sync Code:</span>
+            <span className="font-mono font-black text-cyan-300 text-sm tracking-wider">{roomCode}</span>
           </div>
 
           {/* Pair Phone Button */}
@@ -870,34 +893,24 @@ export function App() {
             
             <h3 className="text-lg font-bold text-white mb-1">Pair Your Phone</h3>
             <p className="text-xs text-zinc-400 mb-4">
-              Make sure your phone is connected to the same Wi-Fi network as your laptop.
+              Enter this 4-digit code in your FocusLock app to pair instantly over the internet or Wi-Fi.
             </p>
 
-            {pairQrData ? (
-              <div className="p-3 bg-zinc-900 border border-cyan-500/40 rounded-2xl mb-3 shadow-xl shadow-cyan-500/10">
-                <img src={pairQrData} alt="Pairing QR Code" className="w-48 h-48 rounded-xl mx-auto" />
+            {/* Big 4-Digit Code Badge */}
+            <div className="w-full bg-cyan-950/40 border border-cyan-500/50 rounded-2xl p-5 mb-4 text-center shadow-lg shadow-cyan-500/10">
+              <div className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest mb-1">
+                Your 4-Digit Sync Code
               </div>
-            ) : (
-              <div className="w-48 h-48 rounded-2xl bg-zinc-900 flex items-center justify-center text-zinc-600 mb-3">
-                Loading QR...
+              <div className="text-4xl font-mono font-black text-cyan-300 tracking-[0.3em]">
+                {roomCode}
               </div>
-            )}
-
-            <div className="text-[11px] text-zinc-400 mb-3">
-              Scan with your phone camera or open in phone browser:
+              <div className="text-[11px] text-zinc-400 mt-2">
+                Type this code on your phone & tap <span className="text-cyan-400 font-bold">Connect Wireless Sync</span>
+              </div>
             </div>
 
-            <a
-              href={pairUrl || "https://catalogs-alex-voted-invision.trycloudflare.com/?mode=phone"}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/50 rounded-xl p-3 text-xs font-mono text-cyan-300 font-bold mb-4 block truncate transition-colors shadow-lg shadow-cyan-500/10"
-            >
-              {pairUrl || "https://catalogs-alex-voted-invision.trycloudflare.com/?mode=phone"}
-            </a>
-
             <div className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-2.5 text-xs font-mono text-zinc-300 mb-5 flex items-center justify-between">
-              <span className="text-zinc-500">Server IP:</span>
+              <span className="text-zinc-500">Local Wi-Fi Server IP:</span>
               <span className="text-cyan-400 font-bold">{serverState?.serverIp || '127.0.0.1'}:4000</span>
             </div>
 

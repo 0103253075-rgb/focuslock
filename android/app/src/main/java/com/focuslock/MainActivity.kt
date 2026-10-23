@@ -39,6 +39,18 @@ class MainActivity : Activity() {
 
         val isFollowerEdition = BuildConfig.FLAVOR == "follower"
 
+        val prefs = getSharedPreferences("focuslock_prefs", Context.MODE_PRIVATE)
+        var initialCode = prefs.getString("sync_code", "") ?: ""
+        var initialHost = prefs.getString("sync_host", "") ?: ""
+
+        val intentData: Uri? = intent?.data
+        if (intentData != null && intentData.scheme == "focuslock") {
+            val r = intentData.getQueryParameter("room")
+            val h = intentData.getQueryParameter("host")
+            if (!r.isNullOrEmpty()) initialCode = r
+            if (!h.isNullOrEmpty()) initialHost = h
+        }
+
         val scrollView = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#09090b"))
             isFillViewport = true
@@ -209,48 +221,94 @@ class MainActivity : Activity() {
         } else {
             // Creator Edition: 100% Laptop Controlled (No phone-side lockdown buttons)
             val connectTitle = TextView(this).apply {
-                text = "STEP 2: CONNECT TO LAPTOP"
+                text = "STEP 2: PAIR WITH LAPTOP STUDIO"
                 textSize = 11f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.parseColor("#a1a1aa"))
                 gravity = Gravity.START
-                setPadding(10, 20, 0, 10)
+                setPadding(10, 20, 0, 8)
             }
 
-            val ipInput = EditText(this).apply {
-                hint = "Laptop IP: 192.168.29.197"
-                setText("192.168.29.197")
+            val pairDesc = TextView(this).apply {
+                text = "Open FocusLock on your laptop and enter the 4-digit Sync Code:"
+                textSize = 12f
+                setTextColor(Color.parseColor("#71717a"))
+                gravity = Gravity.START
+                setPadding(10, 0, 0, 10)
+            }
+
+            // Primary 4-Digit Code Input
+            val codeInput = EditText(this).apply {
+                hint = "e.g. 5821"
+                setText(initialCode)
                 setHintTextColor(Color.parseColor("#52525b"))
-                setTextColor(Color.WHITE)
-                textSize = 13f
+                setTextColor(Color.parseColor("#00F0FF"))
+                textSize = 20f
                 typeface = Typeface.MONOSPACE
                 gravity = Gravity.CENTER
                 setBackgroundColor(Color.parseColor("#18181b"))
-                setPadding(20, 22, 20, 22)
+                setPadding(20, 24, 20, 24)
+            }
+
+            // Server Host (Optional, for Custom Cloud or Local Wi-Fi)
+            val hostLabel = TextView(this).apply {
+                text = "Server Host / Local IP (Optional - leave blank for Cloud):"
+                textSize = 10f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#71717a"))
+                gravity = Gravity.START
+                setPadding(10, 14, 0, 6)
+            }
+
+            val hostInput = EditText(this).apply {
+                hint = "Leave blank for Cloud (or enter 192.168.x.x)"
+                setText(initialHost)
+                setHintTextColor(Color.parseColor("#52525b"))
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                setBackgroundColor(Color.parseColor("#18181b"))
+                setPadding(16, 18, 16, 18)
             }
 
             val connectButton = Button(this).apply {
-                text = "Connect Wireless Sync"
+                text = "⚡ PAIR & CONNECT TO LAPTOP"
                 setBackgroundColor(Color.parseColor("#00F0FF"))
                 setTextColor(Color.parseColor("#09090b"))
                 typeface = Typeface.DEFAULT_BOLD
                 textSize = 14f
                 setPadding(20, 28, 20, 28)
                 setOnClickListener {
-                    val ip = ipInput.text.toString().trim()
-                    val serviceIntent = Intent(this@MainActivity, FocusSyncService::class.java).apply {
-                        if (ip.isNotEmpty()) {
-                            putExtra("server_ip", ip)
-                        }
+                    val code = codeInput.text.toString().trim()
+                    val host = hostInput.text.toString().trim()
+
+                    if (code.isEmpty() && host.isEmpty()) {
+                        Toast.makeText(this@MainActivity, "Please enter your 4-digit Sync Code or Laptop IP!", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
                     }
+
+                    // Save to preferences so user never has to retype
+                    prefs.edit()
+                        .putString("sync_code", code)
+                        .putString("sync_host", host)
+                        .apply()
+
+                    val serviceIntent = Intent(this@MainActivity, FocusSyncService::class.java).apply {
+                        putExtra("sync_code", code)
+                        putExtra("server_host", host)
+                        putExtra("server_ip", if (host.isNotEmpty()) host else code)
+                    }
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(serviceIntent)
                     } else {
                         startService(serviceIntent)
                     }
-                    statusText.text = "🟢 Wireless Focus Sync Active"
+
+                    statusText.text = "🟢 Pairing with Laptop (Code: ${code.ifEmpty { "Local" }})..."
                     statusText.setTextColor(Color.parseColor("#10b981"))
-                    Toast.makeText(this@MainActivity, "Connected! Control lockdowns from your laptop.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Connecting to Laptop Studio...", Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -263,7 +321,10 @@ class MainActivity : Activity() {
             }
 
             root.addView(connectTitle)
-            root.addView(ipInput, marginParams)
+            root.addView(pairDesc)
+            root.addView(codeInput, marginParams)
+            root.addView(hostLabel)
+            root.addView(hostInput, marginParams)
             root.addView(connectButton, marginParams)
             root.addView(remoteHint)
         }

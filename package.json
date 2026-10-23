@@ -1,0 +1,10 @@
+{
+  "name": "focuslock",
+  "version": "1.2.4",
+  "description": "FocusLock Multi-tenant Remote Shield Studio & Cloud Sync Bridge",
+  "scripts": {
+    "postinstall": "cd dashboard && npm install && cd ../server && npm install",
+    "build": "cd dashboard && npm run build",
+    "start": "cd server && npm start"
+  }
+}

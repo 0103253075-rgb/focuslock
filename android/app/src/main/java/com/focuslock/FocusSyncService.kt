@@ -28,6 +28,8 @@ class FocusSyncService : Service() {
         private const val CHANNEL_ID = "focus_lock_sync_channel"
         private const val NOTIFICATION_ID = 1001
 
+        private const val DEFAULT_CLOUD_HOST = "focuslock-studio.onrender.com"
+
         private var activeWebSocket: WebSocket? = null
 
         @Volatile
@@ -63,7 +65,8 @@ class FocusSyncService : Service() {
     }
 
     private var client: OkHttpClient? = null
-    private var serverUrl: String = "wss://catalogs-alex-voted-invision.trycloudflare.com"
+    private var currentRoom: String = "local"
+    private var serverUrl: String = ""
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -75,23 +78,74 @@ class FocusSyncService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val customIp = intent?.getStringExtra("server_ip")?.trim()
-        if (!customIp.isNullOrEmpty()) {
-            var formatted = customIp
-            if (formatted.startsWith("http://")) formatted = formatted.replace("http://", "ws://")
-            else if (formatted.startsWith("https://")) formatted = formatted.replace("https://", "wss://")
-            else if (!formatted.startsWith("ws://") && !formatted.startsWith("wss://")) {
-                if (formatted.contains("trycloudflare.com")) {
-                    formatted = "wss://$formatted"
-                } else {
-                    formatted = if (formatted.contains(":")) "ws://$formatted" else "ws://$formatted:4000"
-                }
-            }
-            serverUrl = formatted
-            Log.i(TAG, "Configured serverUrl: $serverUrl")
-            connectWebSocket()
+        val codeExtra = intent?.getStringExtra("sync_code")?.trim()
+        val hostExtra = intent?.getStringExtra("server_host")?.trim()
+        val legacyIp = intent?.getStringExtra("server_ip")?.trim()
+
+        val prefs = getSharedPreferences("focuslock_prefs", Context.MODE_PRIVATE)
+
+        val code = when {
+            !codeExtra.isNullOrEmpty() -> codeExtra
+            !legacyIp.isNullOrEmpty() && !legacyIp.contains(".") -> legacyIp
+            else -> prefs.getString("sync_code", "") ?: ""
         }
+
+        val host = when {
+            !hostExtra.isNullOrEmpty() -> hostExtra
+            !legacyIp.isNullOrEmpty() && legacyIp.contains(".") -> legacyIp
+            else -> prefs.getString("sync_host", "") ?: ""
+        }
+
+        currentRoom = if (code.isNotEmpty()) code else "local"
+        serverUrl = resolveWebSocketUrl(code, host)
+        Log.i(TAG, "Configured serverUrl: $serverUrl, Room: $currentRoom")
+        connectWebSocket()
         return START_STICKY
+    }
+
+    private fun resolveWebSocketUrl(code: String, host: String): String {
+        // 1. Explicit host provided (e.g. 192.168.29.197 or your-service.onrender.com)
+        if (host.isNotEmpty()) {
+            var clean = host
+                .replace("http://", "")
+                .replace("https://", "")
+                .replace("ws://", "")
+                .replace("wss://", "")
+                .trimEnd('/')
+
+            val isLocal = clean.startsWith("192.168.") || clean.startsWith("10.") ||
+                    clean.startsWith("172.") || clean.startsWith("localhost") || clean.startsWith("127.0.0.1")
+
+            val protocol = if (isLocal) "ws" else "wss"
+            if (isLocal && !clean.contains(":")) {
+                clean = "$clean:4000"
+            }
+            val roomQuery = if (code.isNotEmpty()) code else "local"
+            return "$protocol://$clean/ws?room=$roomQuery&role=phone"
+        }
+
+        // 2. Direct IP or domain entered directly into the code box
+        if (code.contains(".") || code.contains(":")) {
+            var clean = code
+                .replace("http://", "")
+                .replace("https://", "")
+                .replace("ws://", "")
+                .replace("wss://", "")
+                .trimEnd('/')
+
+            val isLocal = clean.startsWith("192.168.") || clean.startsWith("10.") ||
+                    clean.startsWith("172.") || clean.startsWith("localhost") || clean.startsWith("127.0.0.1")
+
+            val protocol = if (isLocal) "ws" else "wss"
+            if (isLocal && !clean.contains(":")) {
+                clean = "$clean:4000"
+            }
+            return "$protocol://$clean/ws?room=local&role=phone"
+        }
+
+        // 3. Default cloud relay with 4-digit room code
+        val roomQuery = if (code.isNotEmpty()) code else "local"
+        return "wss://$DEFAULT_CLOUD_HOST/ws?room=$roomQuery&role=phone"
     }
 
     private fun setupWebSocketClient() {
@@ -102,6 +156,14 @@ class FocusSyncService : Service() {
     }
 
     private fun connectWebSocket() {
+        if (serverUrl.isEmpty()) {
+            val prefs = getSharedPreferences("focuslock_prefs", Context.MODE_PRIVATE)
+            val code = prefs.getString("sync_code", "") ?: ""
+            val host = prefs.getString("sync_host", "") ?: ""
+            currentRoom = if (code.isNotEmpty()) code else "local"
+            serverUrl = resolveWebSocketUrl(code, host)
+        }
+
         try {
             activeWebSocket?.close(1000, "Reconnecting")
             activeWebSocket = null
@@ -109,11 +171,28 @@ class FocusSyncService : Service() {
             val request = Request.Builder().url(serverUrl).build()
             client?.newWebSocket(request, object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
-                    Log.i(TAG, "Connected to Laptop Sync Server at $serverUrl")
+                    Log.i(TAG, "Connected to Laptop Sync Server at $serverUrl (Room: $currentRoom)")
                     activeWebSocket = webSocket
+
+                    // Explicit room handshake
+                    try {
+                        val joinPayload = JSONObject().apply {
+                            put("type", "JOIN_ROOM")
+                            put("room", currentRoom)
+                            put("role", "phone")
+                        }
+                        webSocket.send(joinPayload.toString())
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending JOIN_ROOM", e)
+                    }
+
                     sendHeartbeat(webSocket)
                     android.os.Handler(mainLooper).post {
-                        android.widget.Toast.makeText(applicationContext, "🟢 Connected to Laptop FocusLock!", android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(
+                            applicationContext,
+                            "🟢 Paired with Laptop (Room: ${currentRoom.uppercase()})!",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
 

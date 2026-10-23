@@ -19,10 +19,9 @@ app.use(express.static(distPath));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Helper to get local network IPv4 address (prioritizes active Wi-Fi)
+// Helper to get local network IPv4 address
 function getLocalIpAddress() {
   const interfaces = os.networkInterfaces();
-  // Check Wi-Fi interface first
   for (const name of Object.keys(interfaces)) {
     if (/wi-?fi/i.test(name)) {
       for (const net of interfaces[name]) {
@@ -43,125 +42,191 @@ function getLocalIpAddress() {
 }
 
 const LOCAL_IP = getLocalIpAddress();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
-// Application State
-const state = {
-  isLocked: false,
-  sessionDurationMinutes: 45,
-  remainingSeconds: 0,
-  lockReason: 'Deep Work Session',
-  masterPin: '884422', // Emergency fail-safe PIN
-  accountabilityPrompt: 'Did you make your parents proud today?',
-  motivationalQuotes: [
-    'Did you make your parents proud today?',
-    'Every minute you waste scrolling, someone else is taking your dream.',
-    'Your future self is watching you right now through memories.',
-    'Comfort is the enemy of greatness. Finish what you started.',
-    'Imagine looking back 5 years from now and regretting this exact moment.'
-  ],
-  device: {
-    connected: false,
-    deviceName: 'Not Paired',
-    batteryLevel: 85,
-    isCharging: false,
-    lastSeen: null,
-    ip: null
-  },
-  callHistory: [],
-  activityLogs: [
-    {
-      id: 'log-1',
-      timestamp: new Date().toLocaleTimeString(),
-      type: 'system',
-      message: 'FocusLock Sync Bridge initialized.'
-    }
-  ]
-};
+const MOTIVATIONAL_QUOTES = [
+  'My lack of discipline is an insult to everyone who believes in me.',
+  'Every minute you waste scrolling, someone else is taking your dream.',
+  'Your future self is watching you right now through memories.',
+  'Comfort is the enemy of greatness. Finish what you started.',
+  'Did you make your parents proud today?'
+];
 
-let timerInterval = null;
+// Multi-tenant Room Store: Map<roomCode, RoomState>
+const rooms = new Map();
 
-function addLog(type, message) {
+function getOrCreateRoom(rawCode = 'local') {
+  const code = String(rawCode || 'local').trim().toLowerCase();
+  if (!rooms.has(code)) {
+    rooms.set(code, {
+      code,
+      isLocked: false,
+      sessionDurationMinutes: 45,
+      remainingSeconds: 0,
+      lockReason: 'Deep Work Session',
+      masterPin: '884422',
+      accountabilityPrompt: 'My lack of discipline is an insult to everyone who believes in me.',
+      device: {
+        connected: false,
+        deviceName: 'Not Paired',
+        batteryLevel: 85,
+        isCharging: false,
+        lastSeen: null,
+        ip: null
+      },
+      callHistory: [],
+      activityLogs: [
+        {
+          id: `log-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          type: 'system',
+          message: `FocusLock Studio room [${code.toUpperCase()}] initialized.`
+        }
+      ],
+      dashboardSockets: new Set(),
+      phoneSockets: new Set(),
+      timerInterval: null
+    });
+  }
+  return rooms.get(code);
+}
+
+function addRoomLog(room, type, message) {
   const entry = {
     id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     type,
     message
   };
-  state.activityLogs.unshift(entry);
-  if (state.activityLogs.length > 50) state.activityLogs.pop();
+  room.activityLogs.unshift(entry);
+  if (room.activityLogs.length > 50) room.activityLogs.pop();
 }
 
-function broadcastState() {
+function broadcastRoomState(room) {
   const payload = JSON.stringify({
     type: 'STATE_UPDATE',
+    room: room.code,
     state: {
-      ...state,
+      isLocked: room.isLocked,
+      sessionDurationMinutes: room.sessionDurationMinutes,
+      remainingSeconds: room.remainingSeconds,
+      lockReason: room.lockReason,
+      masterPin: room.masterPin,
+      accountabilityPrompt: room.accountabilityPrompt,
+      device: room.device,
+      callHistory: room.callHistory,
+      activityLogs: room.activityLogs,
       serverIp: LOCAL_IP,
-      serverPort: PORT
+      serverPort: PORT,
+      roomCode: room.code
     }
   });
 
-  wss.clients.forEach((client) => {
+  room.dashboardSockets.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  });
+  room.phoneSockets.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
     }
   });
 }
 
-function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    if (state.isLocked) {
-      if (state.remainingSeconds > 0) {
-        state.remainingSeconds--;
-        broadcastState();
+function startRoomTimer(room) {
+  if (room.timerInterval) clearInterval(room.timerInterval);
+  room.timerInterval = setInterval(() => {
+    if (room.isLocked) {
+      if (room.remainingSeconds > 0) {
+        room.remainingSeconds--;
+        broadcastRoomState(room);
       } else {
-        // Auto-unlock (Dead Man's Fail-safe)
-        state.isLocked = false;
-        clearInterval(timerInterval);
-        addLog('unlock', '⏰ Focus session completed! Phone auto-unlocked safely.');
-        broadcastState();
+        room.isLocked = false;
+        clearInterval(room.timerInterval);
+        room.timerInterval = null;
+        addRoomLog(room, 'unlock', '⏰ Focus session completed! Phone auto-unlocked safely.');
+        broadcastRoomState(room);
       }
     } else {
-      clearInterval(timerInterval);
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
     }
   }, 1000);
 }
 
-// WebSocket connections
+// WebSocket connections with Room assignment
 wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const roomCode = url.searchParams.get('room') || 'local';
+  const role = url.searchParams.get('role') || 'dashboard'; // 'dashboard' or 'phone'
   const remoteIp = req.socket.remoteAddress;
-  console.log(`[WS] Client connected from ${remoteIp}`);
 
-  // Send current state immediately on connect
+  const room = getOrCreateRoom(roomCode);
+
+  if (role === 'phone') {
+    room.phoneSockets.add(ws);
+    room.device.connected = true;
+    room.device.ip = remoteIp;
+    room.device.lastSeen = Date.now();
+    addRoomLog(room, 'system', `📱 Android phone connected to room [${roomCode.toUpperCase()}].`);
+    broadcastRoomState(room);
+  } else {
+    room.dashboardSockets.add(ws);
+  }
+
+  console.log(`[WS] ${role.toUpperCase()} connected to room [${roomCode}] from ${remoteIp}`);
+
+  // Send current room state immediately on connect
   ws.send(JSON.stringify({
     type: 'STATE_UPDATE',
+    room: room.code,
     state: {
-      ...state,
+      isLocked: room.isLocked,
+      sessionDurationMinutes: room.sessionDurationMinutes,
+      remainingSeconds: room.remainingSeconds,
+      lockReason: room.lockReason,
+      masterPin: room.masterPin,
+      accountabilityPrompt: room.accountabilityPrompt,
+      device: room.device,
+      callHistory: room.callHistory,
+      activityLogs: room.activityLogs,
       serverIp: LOCAL_IP,
-      serverPort: PORT
+      serverPort: PORT,
+      roomCode: room.code
     }
   }));
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      
+
+      // Support dynamic room join from socket message if not in query
+      if (data.type === 'JOIN_ROOM' && data.room) {
+        const targetRoom = getOrCreateRoom(data.room);
+        if (data.role === 'phone') {
+          room.phoneSockets.delete(ws);
+          targetRoom.phoneSockets.add(ws);
+          targetRoom.device.connected = true;
+          broadcastRoomState(targetRoom);
+        }
+        return;
+      }
+
       // Phone Heartbeat
       if (data.type === 'DEVICE_HEARTBEAT') {
-        state.device = {
+        room.device = {
           connected: true,
           deviceName: data.deviceName || 'Android Device',
-          batteryLevel: data.batteryLevel ?? state.device.batteryLevel,
+          batteryLevel: data.batteryLevel ?? room.device.batteryLevel,
           isCharging: Boolean(data.isCharging),
           lastSeen: Date.now(),
           ip: remoteIp
         };
-        broadcastState();
+        broadcastRoomState(room);
       }
 
-      // Incoming Call Interception report from Android Phone
+      // Incoming Call Interception report from Phone
       if (data.type === 'CALL_EVENT') {
         const { callerNumber, callerName, isRepeatCaller, action } = data;
         const entry = {
@@ -169,25 +234,27 @@ wss.on('connection', (ws, req) => {
           timestamp: new Date().toLocaleTimeString(),
           caller: callerName || callerNumber || 'Unknown Caller',
           isRepeatCaller: Boolean(isRepeatCaller),
-          action: action // 'MUTED' or 'RING_ALLOWED'
+          action: action
         };
-        state.callHistory.unshift(entry);
-        
+        room.callHistory.unshift(entry);
         if (isRepeatCaller) {
-          addLog('emergency_call', `🚨 Emergency bypass: ${entry.caller} called twice! Phone is RINGING.`);
+          addRoomLog(room, 'emergency_call', `🚨 Emergency bypass: ${entry.caller} called twice! Phone is RINGING.`);
         } else {
-          addLog('call', `🔕 Call muted from ${entry.caller} (First attempt - silenced).`);
+          addRoomLog(room, 'call', `🔕 Call muted from ${entry.caller} (1st attempt - silenced).`);
         }
-        broadcastState();
+        broadcastRoomState(room);
       }
 
       // Emergency Unlock from phone Master PIN
       if (data.type === 'PHONE_PIN_UNLOCK') {
-        if (data.pin === state.masterPin) {
-          state.isLocked = false;
-          if (timerInterval) clearInterval(timerInterval);
-          addLog('emergency_unlock', '🔑 Emergency Master PIN entered on phone. Lockdown dismissed.');
-          broadcastState();
+        if (data.pin === room.masterPin) {
+          room.isLocked = false;
+          if (room.timerInterval) {
+            clearInterval(room.timerInterval);
+            room.timerInterval = null;
+          }
+          addRoomLog(room, 'emergency_unlock', '🔑 Emergency Master PIN entered on phone. Lockdown dismissed.');
+          broadcastRoomState(room);
         }
       }
     } catch (err) {
@@ -196,18 +263,36 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    console.log('[WS] Client disconnected');
+    if (role === 'phone') {
+      room.phoneSockets.delete(ws);
+      if (room.phoneSockets.size === 0) {
+        room.device.connected = false;
+        addRoomLog(room, 'system', `📱 Phone disconnected from room [${roomCode.toUpperCase()}].`);
+        broadcastRoomState(room);
+      }
+    } else {
+      room.dashboardSockets.delete(ws);
+    }
   });
 });
 
-// REST Endpoints
+// REST Endpoints (Supports ?room=XXXX or body.room)
 app.get('/api/status', (req, res) => {
+  const room = getOrCreateRoom(req.query.room);
   res.json({
     success: true,
     state: {
-      ...state,
+      isLocked: room.isLocked,
+      sessionDurationMinutes: room.sessionDurationMinutes,
+      remainingSeconds: room.remainingSeconds,
+      lockReason: room.lockReason,
+      masterPin: room.masterPin,
+      accountabilityPrompt: room.accountabilityPrompt,
+      device: room.device,
+      activityLogs: room.activityLogs,
       serverIp: LOCAL_IP,
-      serverPort: PORT
+      serverPort: PORT,
+      roomCode: room.code
     }
   });
 });
@@ -215,9 +300,8 @@ app.get('/api/status', (req, res) => {
 // QR Code for one-click phone pairing
 app.get('/api/pair-qr', async (req, res) => {
   try {
-    // Primary: Cloudflare Global HTTPS Tunnel (Works on any phone/network without firewall issues)
-    const tunnelUrl = 'https://catalogs-alex-voted-invision.trycloudflare.com/?mode=phone';
-    const pairUrl = tunnelUrl;
+    const roomCode = req.query.room || 'local';
+    const pairUrl = `focuslock://pair?room=${roomCode}`;
     const qrDataUrl = await QRCode.toDataURL(pairUrl, {
       margin: 1,
       color: {
@@ -225,112 +309,76 @@ app.get('/api/pair-qr', async (req, res) => {
         light: '#09090b'
       }
     });
-    res.json({ success: true, qr: qrDataUrl, url: pairUrl, tunnelUrl, ip: LOCAL_IP, port: PORT });
+    res.json({ success: true, qr: qrDataUrl, room: roomCode, ip: LOCAL_IP, port: PORT });
   } catch (err) {
     res.status(500).json({ error: 'Failed to generate QR code' });
   }
 });
 
-// SPA fallback
+// Trigger Lock from PC
+app.post('/api/lock', (req, res) => {
+  const { room: roomCode = 'local', durationMinutes = 45, reason = 'Deep Work Session' } = req.body;
+  const room = getOrCreateRoom(roomCode);
+
+  room.isLocked = true;
+  room.sessionDurationMinutes = durationMinutes;
+  room.remainingSeconds = durationMinutes * 60;
+  room.lockReason = reason;
+
+  const randIdx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
+  room.accountabilityPrompt = MOTIVATIONAL_QUOTES[randIdx];
+
+  startRoomTimer(room);
+  addRoomLog(room, 'lock', `🔒 Focus Lock ACTIVATED for ${durationMinutes} minutes. Phone is now locked.`);
+  broadcastRoomState(room);
+
+  res.json({ success: true, state: room });
+});
+
+// Trigger Unlock from PC
+app.post('/api/unlock', (req, res) => {
+  const { room: roomCode = 'local', reason = 'Completed session early' } = req.body;
+  const room = getOrCreateRoom(roomCode);
+
+  room.isLocked = false;
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = null;
+  }
+
+  addRoomLog(room, 'unlock', `🔓 Focus Lock deactivated from laptop (${reason}).`);
+  broadcastRoomState(room);
+
+  res.json({ success: true, state: room });
+});
+
+// Emergency Unlock
+app.post('/api/emergency-unlock', (req, res) => {
+  const { room: roomCode = 'local' } = req.body;
+  const room = getOrCreateRoom(roomCode);
+
+  room.isLocked = false;
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = null;
+  }
+
+  addRoomLog(room, 'emergency_unlock', '⚠️ Instant Emergency Unlock triggered from dashboard.');
+  broadcastRoomState(room);
+
+  res.json({ success: true, state: room });
+});
+
+// SPA fallback for React Dashboard
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// Trigger Lock from PC
-app.post('/api/lock', (req, res) => {
-  const { durationMinutes = 45, reason = 'Deep Work Session' } = req.body;
-  state.isLocked = true;
-  state.sessionDurationMinutes = durationMinutes;
-  state.remainingSeconds = durationMinutes * 60;
-  state.lockReason = reason;
-
-  // Pick a fresh motivational prompt
-  const randIdx = Math.floor(Math.random() * state.motivationalQuotes.length);
-  state.accountabilityPrompt = state.motivationalQuotes[randIdx];
-
-  startTimer();
-  addLog('lock', `🔒 Focus Lock ACTIVATED for ${durationMinutes} minutes. Phone is now locked.`);
-  broadcastState();
-
-  res.json({ success: true, state });
-});
-
-// Trigger Unlock from PC (after passing friction modal)
-app.post('/api/unlock', (req, res) => {
-  const { reason = 'Completed session early' } = req.body;
-  state.isLocked = false;
-  if (timerInterval) clearInterval(timerInterval);
-
-  addLog('unlock', `🔓 Focus Lock deactivated from laptop (${reason}).`);
-  broadcastState();
-
-  res.json({ success: true, state });
-});
-
-// Emergency Unlock (zero friction, immediate fail-safe)
-app.post('/api/emergency-unlock', (req, res) => {
-  state.isLocked = false;
-  if (timerInterval) clearInterval(timerInterval);
-
-  addLog('emergency_unlock', '⚠️ Instant Emergency Unlock triggered from dashboard.');
-  broadcastState();
-
-  res.json({ success: true, state });
-});
-
-// Device Simulation Endpoint (for testing before physical Android pairing)
-app.post('/api/simulate-device', (req, res) => {
-  const { connected = true, battery = 88, isCharging = false, deviceName = "Pixel 8 Pro" } = req.body;
-  state.device = {
-    connected,
-    deviceName,
-    batteryLevel: battery,
-    isCharging,
-    lastSeen: Date.now(),
-    ip: '192.168.1.105'
-  };
-  addLog('system', `📱 Device '${deviceName}' connected and synced.`);
-  broadcastState();
-  res.json({ success: true, device: state.device });
-});
-
-// Simulate Incoming Call (for testing the Repeat-Caller filter)
-app.post('/api/simulate-call', (req, res) => {
-  const { caller = "Mom", number = "+91 98765 43210" } = req.body;
-  
-  // Check if called within last 5 minutes
-  const now = Date.now();
-  const recentCall = state.callHistory.find(
-    (c) => c.caller === caller && (now - (c.timeMs || now)) < 300000
-  );
-
-  const isRepeat = Boolean(recentCall);
-  const entry = {
-    id: `call-${now}`,
-    timeMs: now,
-    timestamp: new Date().toLocaleTimeString(),
-    caller,
-    number,
-    isRepeatCaller: isRepeat,
-    action: isRepeat ? 'RING_ALLOWED' : 'MUTED'
-  };
-
-  state.callHistory.unshift(entry);
-  if (isRepeat) {
-    addLog('emergency_call', `🚨 Emergency Bypass Triggered: ${caller} called twice! Ringer sound ACTIVATED.`);
-  } else {
-    addLog('call', `🔕 Incoming call from ${caller} - Muted silently (1st call).`);
-  }
-
-  broadcastState();
-  res.json({ success: true, call: entry });
-});
-
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
-  console.log(`🛡️  FocusLock Real-time Sync Server Active!`);
-  console.log(`📡 Local Wi-Fi IP: http://${LOCAL_IP}:${PORT}`);
-  console.log(`🌐 Localhost:     http://localhost:${PORT}`);
+  console.log(`🛡️  FocusLock Cloud Multi-Room Studio Active!`);
+  console.log(`📡 Port:          ${PORT}`);
+  console.log(`🌐 Local Wi-Fi:   http://${LOCAL_IP}:${PORT}`);
   console.log(`======================================================\n`);
 });
