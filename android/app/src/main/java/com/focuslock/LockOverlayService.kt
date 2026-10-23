@@ -1,11 +1,13 @@
 package com.focuslock
 
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
+import android.media.AudioManager
 import android.os.Build
 import android.os.CountDownTimer
 import android.os.IBinder
