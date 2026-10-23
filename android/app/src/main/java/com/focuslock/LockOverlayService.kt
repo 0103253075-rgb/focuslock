@@ -30,8 +30,8 @@ class LockOverlayService : Service() {
     private var savedRingVol: Int = 5
     private var savedNotifVol: Int = 5
 
-    // In-overlay PIN state
-    private val enteredPin = StringBuilder()
+    // In-overlay PIN state using pure Kotlin Strings
+    private var enteredPin: String = ""
     private var pinDotsText: TextView? = null
     private var normalLockLayout: LinearLayout? = null
     private var pinPadLayout: LinearLayout? = null
@@ -191,7 +191,7 @@ class LockOverlayService : Service() {
             textSize = 12f
             setPadding(30, 20, 30, 20)
             setOnClickListener {
-                enteredPin.setLength(0)
+                enteredPin = ""
                 updatePinDisplay()
                 normalLockLayout?.visibility = View.GONE
                 pinPadLayout?.visibility = View.VISIBLE
@@ -285,13 +285,13 @@ class LockOverlayService : Service() {
                             }
                             "DEL" -> {
                                 if (enteredPin.isNotEmpty()) {
-                                    enteredPin.delete(enteredPin.length - 1, enteredPin.length)
+                                    enteredPin = enteredPin.dropLast(1)
                                 }
                                 updatePinDisplay()
                             }
                             else -> {
                                 if (enteredPin.length < 6) {
-                                    enteredPin.append(btnText)
+                                    enteredPin += btnText
                                     updatePinDisplay()
                                     if (enteredPin.length == 6) {
                                         checkPinAndUnlock()
@@ -340,12 +340,12 @@ class LockOverlayService : Service() {
     }
 
     private fun checkPinAndUnlock() {
-        if (enteredPin.toString() == MASTER_PIN) {
+        if (enteredPin == MASTER_PIN) {
             Toast.makeText(this, "🔑 Master PIN Verified. Unlocking phone!", Toast.LENGTH_SHORT).show()
             dismissNow()
         } else {
             Toast.makeText(this, "Incorrect PIN! Try 884422", Toast.LENGTH_SHORT).show()
-            enteredPin.setLength(0)
+            enteredPin = ""
             updatePinDisplay()
         }
     }
