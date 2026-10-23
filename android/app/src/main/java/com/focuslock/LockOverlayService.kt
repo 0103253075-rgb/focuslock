@@ -426,6 +426,11 @@ class LockOverlayService : Service() {
     private fun checkPinAndUnlock() {
         if (enteredPin.trim() == MASTER_PIN.trim()) {
             Toast.makeText(this, "🔑 Master PIN Verified. Unlocking phone!", Toast.LENGTH_SHORT).show()
+            try {
+                FocusSyncService.notifyPinUnlocked(MASTER_PIN)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             removeOverlay()
             stopSelf()
             goToHomeScreen()

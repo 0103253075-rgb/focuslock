@@ -63,9 +63,9 @@ jobs:
       - name: Publish Direct Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.2
-          name: "FocusLock v1.2.2 (Follower & Creator Editions)"
-          body: "Fix: Consumes 5th tap, 350ms debounce, visible digits on keypad, and auto-navigates to Home Screen on unlock."
+          tag_name: v1.2.3
+          name: "FocusLock v1.2.3 (Follower & Creator Editions)"
+          body: "Creator Edition: Removed phone-side timer (100% laptop controlled) + Phone Master PIN now stops laptop lock broadcast."
           files: |
             release_apks/FocusLock-Follower-Edition.apk
             release_apks/FocusLock-Creator-Pro.apk

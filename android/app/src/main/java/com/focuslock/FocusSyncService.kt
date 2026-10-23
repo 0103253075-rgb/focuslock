@@ -30,6 +30,23 @@ class FocusSyncService : Service() {
 
         private var activeWebSocket: WebSocket? = null
 
+        @Volatile
+        var isLocalUnlocked: Boolean = false
+
+        fun notifyPinUnlocked(pin: String) {
+            isLocalUnlocked = true
+            try {
+                val json = JSONObject().apply {
+                    put("type", "PHONE_PIN_UNLOCK")
+                    put("pin", pin)
+                }
+                activeWebSocket?.send(json.toString())
+                Log.i(TAG, "Sent PHONE_PIN_UNLOCK to laptop server")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send PIN unlock to WS", e)
+            }
+        }
+
         fun sendCallEvent(number: String, isRepeatCaller: Boolean, action: String) {
             try {
                 val json = JSONObject().apply {
@@ -130,6 +147,11 @@ class FocusSyncService : Service() {
                 val reason = state.optString("lockReason", "Focus Session")
 
                 if (isLocked) {
+                    if (isLocalUnlocked) {
+                        // User manually entered Master PIN on their phone!
+                        // Do NOT re-lock the phone.
+                        return
+                    }
                     if (!LockOverlayService.isOverlayShowing) {
                         val lockIntent = Intent(this, LockOverlayService::class.java).apply {
                             putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, durationMins)
@@ -138,6 +160,7 @@ class FocusSyncService : Service() {
                         startService(lockIntent)
                     }
                 } else {
+                    isLocalUnlocked = false
                     // Unconditionally dismiss overlay immediately in 0ms
                     LockOverlayService.dismissNow()
                 }

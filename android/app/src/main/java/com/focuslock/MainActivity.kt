@@ -26,13 +26,13 @@ class MainActivity : Activity() {
     private lateinit var overlayButton: Button
     private lateinit var dndButton: Button
     private lateinit var callPermButton: Button
-    private var selectedDuration = 45
 
-    // Duration buttons
-    private lateinit var btn25: Button
-    private lateinit var btn45: Button
-    private lateinit var btn60: Button
-    private lateinit var startLockdownButton: Button
+    // Follower edition duration controls
+    private var selectedDuration = 45
+    private var btn25: Button? = null
+    private var btn45: Button? = null
+    private var btn60: Button? = null
+    private var startLockdownButton: Button? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         }
 
         val subtitle = TextView(this).apply {
-            text = if (isFollowerEdition) "Discipline & Deep Work Studio" else "Total Distraction Elimination Studio (Pro)"
+            text = if (isFollowerEdition) "Discipline & Deep Work Studio" else "Remote Lockdown Studio (Laptop Controlled)"
             textSize = 13f
             setTextColor(Color.parseColor("#71717a"))
             gravity = Gravity.CENTER
@@ -150,46 +150,6 @@ class MainActivity : Activity() {
             }
         }
 
-        // Section 2: Choose Duration
-        val durationTitle = TextView(this).apply {
-            text = "STEP 2: CHOOSE SESSION DURATION"
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#a1a1aa"))
-            gravity = Gravity.START
-            setPadding(10, 20, 0, 10)
-        }
-
-        val durationRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 16) }
-        }
-
-        btn25 = createDurationButton("25m\nPomodoro", 25)
-        btn45 = createDurationButton("45m\nDeep Work", 45)
-        btn60 = createDurationButton("60m\nUltra", 60)
-
-        durationRow.addView(btn25)
-        durationRow.addView(btn45)
-        durationRow.addView(btn60)
-
-        // Primary Start Lockdown Button
-        startLockdownButton = Button(this).apply {
-            text = "⚡ START FOCUS LOCKDOWN (45m)"
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#09090b"))
-            setBackgroundColor(Color.parseColor("#00F0FF"))
-            setPadding(20, 32, 20, 32)
-            setOnClickListener {
-                startStandaloneLockdown()
-            }
-        }
-
         root.addView(logo)
         root.addView(subtitle)
         root.addView(statusText)
@@ -197,19 +157,64 @@ class MainActivity : Activity() {
         root.addView(overlayButton, marginParams)
         root.addView(dndButton, marginParams)
         root.addView(callPermButton, marginParams)
-        root.addView(durationTitle)
-        root.addView(durationRow)
-        root.addView(startLockdownButton, marginParams)
 
-        // Creator Pro Edition: Wireless Laptop Sync section
-        if (!isFollowerEdition) {
-            val syncDivider = TextView(this).apply {
-                text = "─── OR WIRELESS LAPTOP SYNC ───"
+        if (isFollowerEdition) {
+            // Follower Edition: Standalone Duration selector & Start Lockdown button
+            val durationTitle = TextView(this).apply {
+                text = "STEP 2: CHOOSE SESSION DURATION"
                 textSize = 11f
-                typeface = Typeface.MONOSPACE
-                setTextColor(Color.parseColor("#52525b"))
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#a1a1aa"))
+                gravity = Gravity.START
+                setPadding(10, 20, 0, 10)
+            }
+
+            val durationRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
-                setPadding(0, 25, 0, 15)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, 16) }
+            }
+
+            val b25 = createDurationButton("25m\nPomodoro", 25)
+            val b45 = createDurationButton("45m\nDeep Work", 45)
+            val b60 = createDurationButton("60m\nUltra", 60)
+            btn25 = b25
+            btn45 = b45
+            btn60 = b60
+
+            durationRow.addView(b25)
+            durationRow.addView(b45)
+            durationRow.addView(b60)
+
+            val startBtn = Button(this).apply {
+                text = "⚡ START FOCUS LOCKDOWN (45m)"
+                textSize = 14f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#09090b"))
+                setBackgroundColor(Color.parseColor("#00F0FF"))
+                setPadding(20, 32, 20, 32)
+                setOnClickListener {
+                    startStandaloneLockdown()
+                }
+            }
+            startLockdownButton = startBtn
+
+            root.addView(durationTitle)
+            root.addView(durationRow)
+            root.addView(startBtn, marginParams)
+            selectDuration(45)
+        } else {
+            // Creator Edition: 100% Laptop Controlled (No phone-side lockdown buttons)
+            val connectTitle = TextView(this).apply {
+                text = "STEP 2: CONNECT TO LAPTOP"
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#a1a1aa"))
+                gravity = Gravity.START
+                setPadding(10, 20, 0, 10)
             }
 
             val ipInput = EditText(this).apply {
@@ -221,15 +226,16 @@ class MainActivity : Activity() {
                 typeface = Typeface.MONOSPACE
                 gravity = Gravity.CENTER
                 setBackgroundColor(Color.parseColor("#18181b"))
-                setPadding(20, 20, 20, 20)
+                setPadding(20, 22, 20, 22)
             }
 
             val connectButton = Button(this).apply {
                 text = "Connect Wireless Sync"
-                setBackgroundColor(Color.parseColor("#27272a"))
-                setTextColor(Color.parseColor("#00F0FF"))
+                setBackgroundColor(Color.parseColor("#00F0FF"))
+                setTextColor(Color.parseColor("#09090b"))
                 typeface = Typeface.DEFAULT_BOLD
-                textSize = 13f
+                textSize = 14f
+                setPadding(20, 28, 20, 28)
                 setOnClickListener {
                     val ip = ipInput.text.toString().trim()
                     val serviceIntent = Intent(this@MainActivity, FocusSyncService::class.java).apply {
@@ -244,13 +250,22 @@ class MainActivity : Activity() {
                     }
                     statusText.text = "🟢 Wireless Focus Sync Active"
                     statusText.setTextColor(Color.parseColor("#10b981"))
-                    Toast.makeText(this@MainActivity, "Sync running! Ready for laptop lockdown.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Connected! Control lockdowns from your laptop.", Toast.LENGTH_LONG).show()
                 }
             }
 
-            root.addView(syncDivider)
+            val remoteHint = TextView(this).apply {
+                text = "💡 Trigger and manage all lock sessions directly from your laptop dashboard."
+                textSize = 11f
+                setTextColor(Color.parseColor("#71717a"))
+                gravity = Gravity.CENTER
+                setPadding(0, 10, 0, 0)
+            }
+
+            root.addView(connectTitle)
             root.addView(ipInput, marginParams)
             root.addView(connectButton, marginParams)
+            root.addView(remoteHint)
         }
 
         // Safety Instructions Box
@@ -284,7 +299,6 @@ class MainActivity : Activity() {
         root.addView(safetyBox)
 
         setContentView(scrollView)
-        selectDuration(45)
     }
 
     private fun createDurationButton(label: String, mins: Int): Button {
@@ -308,18 +322,16 @@ class MainActivity : Activity() {
         val inactiveBg = Color.parseColor("#18181b")
         val inactiveText = Color.parseColor("#a1a1aa")
 
-        btn25.setBackgroundColor(if (mins == 25) activeBg else inactiveBg)
-        btn25.setTextColor(if (mins == 25) activeText else inactiveText)
+        btn25?.setBackgroundColor(if (mins == 25) activeBg else inactiveBg)
+        btn25?.setTextColor(if (mins == 25) activeText else inactiveText)
 
-        btn45.setBackgroundColor(if (mins == 45) activeBg else inactiveBg)
-        btn45.setTextColor(if (mins == 45) activeText else inactiveText)
+        btn45?.setBackgroundColor(if (mins == 45) activeBg else inactiveBg)
+        btn45?.setTextColor(if (mins == 45) activeText else inactiveText)
 
-        btn60.setBackgroundColor(if (mins == 60) activeBg else inactiveBg)
-        btn60.setTextColor(if (mins == 60) activeText else inactiveText)
+        btn60?.setBackgroundColor(if (mins == 60) activeBg else inactiveBg)
+        btn60?.setTextColor(if (mins == 60) activeText else inactiveText)
 
-        if (::startLockdownButton.isInitialized) {
-            startLockdownButton.text = "⚡ START FOCUS LOCKDOWN (${mins}m)"
-        }
+        startLockdownButton?.text = "⚡ START FOCUS LOCKDOWN (${mins}m)"
     }
 
     private fun startStandaloneLockdown() {
@@ -384,7 +396,7 @@ class MainActivity : Activity() {
         }
 
         if (canDraw) {
-            statusText.text = "⚡ Ready to Lock! Choose duration below."
+            statusText.text = "⚡ Ready! Connect or start session."
             statusText.setTextColor(Color.parseColor("#10b981"))
         } else {
             statusText.text = "Grant Screen Shield permission above to enable"
