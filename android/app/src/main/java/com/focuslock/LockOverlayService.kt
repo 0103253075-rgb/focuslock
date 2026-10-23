@@ -128,8 +128,8 @@ class LockOverlayService : Service() {
 
         // Custom touch intercepting root layout (Guarantees 5-tap detection anywhere)
         val frame = object : FrameLayout(this) {
-            override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-                if (ev.action == MotionEvent.ACTION_DOWN) {
+            override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+                if (ev?.action == MotionEvent.ACTION_DOWN) {
                     val now = System.currentTimeMillis()
                     if (now - lastTapTime < 900) {
                         tapCount++
