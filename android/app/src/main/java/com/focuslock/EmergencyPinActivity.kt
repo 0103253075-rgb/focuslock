@@ -67,11 +67,8 @@ class EmergencyPinActivity : Activity() {
             setOnClickListener {
                 val entered = pinInput.text.toString().trim()
                 if (entered == MASTER_PIN) {
-                    // Send intent to dismiss overlay
-                    val unlockIntent = Intent(this@EmergencyPinActivity, LockOverlayService::class.java).apply {
-                        action = LockOverlayService.ACTION_UNLOCK
-                    }
-                    startService(unlockIntent)
+                    // Instantly dismiss overlay
+                    LockOverlayService.dismissNow()
 
                     Toast.makeText(this@EmergencyPinActivity, "Master PIN Accepted. Unlocked!", Toast.LENGTH_LONG).show()
                     finish()

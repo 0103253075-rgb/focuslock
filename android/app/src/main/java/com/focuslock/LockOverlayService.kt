@@ -46,6 +46,7 @@ class LockOverlayService : Service() {
         const val EXTRA_DURATION_MINUTES = "extra_duration_minutes"
         const val EXTRA_REASON = "extra_reason"
         const val MASTER_PIN = "884422"
+        const val ACTION_UNLOCK = "com.focuslock.ACTION_UNLOCK"
 
         @Volatile
         var currentInstance: LockOverlayService? = null
@@ -75,6 +76,10 @@ class LockOverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_UNLOCK) {
+            dismissNow()
+            return START_NOT_STICKY
+        }
         currentInstance = this
         val durationMinutes = intent?.getIntExtra(EXTRA_DURATION_MINUTES, 45) ?: 45
         val reason = intent?.getStringExtra(EXTRA_REASON) ?: "Deep Focus"
@@ -107,7 +112,7 @@ class LockOverlayService : Service() {
             e.printStackTrace()
         }
 
-        val layoutParams = WindowManager.LayoutParams(
+        val wmParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -123,7 +128,7 @@ class LockOverlayService : Service() {
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            wmParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
         // Custom touch intercepting root layout (Guarantees 5-tap detection anywhere)
@@ -372,7 +377,7 @@ class LockOverlayService : Service() {
         frame.addView(normalLayout)
         frame.addView(pinLayout)
 
-        windowManager?.addView(frame, layoutParams)
+        windowManager?.addView(frame, wmParams)
         isOverlayShowing = true
         EmergencyCallReceiver.isFocusLockActive = true
 
