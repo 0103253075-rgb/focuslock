@@ -28,16 +28,20 @@ jobs:
 
       - name: Build Debug APK
         working-directory: ./android
-        run: |
-          gradle assembleDebug --stacktrace 2>&1 | tee ../build.log
+        run: gradle assembleDebug --stacktrace
 
-      - name: Save Error to Summary
-        if: always()
-        run: |
-          tail -n 60 build.log >> $GITHUB_STEP_SUMMARY || true
-
-      - name: Upload APK
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FocusLock-Debug-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish Direct Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.1.0
+          name: "FocusLock v1.1.0 (Direct APK)"
+          body: "Approved UI update with discipline quote, global 5-tap interceptor, and 0ms instant dismiss."
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
