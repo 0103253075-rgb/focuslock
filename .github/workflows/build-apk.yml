@@ -63,9 +63,9 @@ jobs:
       - name: Publish Direct Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.0
-          name: "FocusLock v1.2.0 (Follower & Creator Editions)"
-          body: "Direct 1-tap download for both Follower (Standalone) and Creator (Remote Sync) editions."
+          tag_name: v1.2.1
+          name: "FocusLock v1.2.1 (Follower & Creator Editions)"
+          body: "Fix: Master PIN keypad touch interceptor - 884422 now unlocks smoothly without input reset."
           files: |
             release_apks/FocusLock-Follower-Edition.apk
             release_apks/FocusLock-Creator-Pro.apk

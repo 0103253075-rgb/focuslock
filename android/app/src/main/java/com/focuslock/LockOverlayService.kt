@@ -135,20 +135,23 @@ class LockOverlayService : Service() {
         val frame = object : FrameLayout(this) {
             override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
                 if (ev?.action == MotionEvent.ACTION_DOWN) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastTapTime < 900) {
-                        tapCount++
-                    } else {
-                        tapCount = 1
-                    }
-                    lastTapTime = now
+                    // Only count 5-taps when normal lock screen is showing (NOT while entering PIN)
+                    if (pinPadLayout?.visibility != View.VISIBLE) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastTapTime < 900) {
+                            tapCount++
+                        } else {
+                            tapCount = 1
+                        }
+                        lastTapTime = now
 
-                    if (tapCount >= 5) {
-                        tapCount = 0
-                        enteredPin = ""
-                        updatePinDisplay()
-                        normalLockLayout?.visibility = View.GONE
-                        pinPadLayout?.visibility = View.VISIBLE
+                        if (tapCount >= 5) {
+                            tapCount = 0
+                            enteredPin = ""
+                            updatePinDisplay()
+                            normalLockLayout?.visibility = View.GONE
+                            pinPadLayout?.visibility = View.VISIBLE
+                        }
                     }
                 }
                 return super.dispatchTouchEvent(ev)
@@ -439,8 +442,12 @@ class LockOverlayService : Service() {
 
         if (rootLayout != null && windowManager != null) {
             try {
-                windowManager?.removeView(rootLayout)
-            } catch (e: Exception) {}
+                windowManager?.removeViewImmediate(rootLayout)
+            } catch (e: Exception) {
+                try {
+                    windowManager?.removeView(rootLayout)
+                } catch (ex: Exception) {}
+            }
             rootLayout = null
         }
         isOverlayShowing = false
