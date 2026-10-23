@@ -11,8 +11,8 @@ android {
         applicationId = "com.focuslock"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.2.5"
+        versionCode = 6
+        versionName = "1.2.6"
         manifestPlaceholders["appLabel"] = "FocusLock"
     }
 

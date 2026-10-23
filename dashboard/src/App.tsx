@@ -624,7 +624,7 @@ export function App() {
                     <Clock className="w-3.5 h-3.5 text-cyan-400" />
                     Select Lock Duration
                   </label>
-                  <div className="grid grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-5 gap-2">
                     {[25, 45, 60, 90].map((mins) => (
                       <button
                         key={mins}
@@ -637,11 +637,42 @@ export function App() {
                       >
                         <div className="text-sm">{mins}m</div>
                         <div className="text-[10px] text-zinc-500 font-sans mt-0.5">
-                          {mins === 25 ? 'Pomodoro' : mins === 45 ? 'Sprint' : mins === 60 ? 'Standard' : 'Hardcore'}
+                          {mins === 25 ? 'Pomodoro' : mins === 45 ? 'Sprint' : mins === 60 ? 'Standard' : 'Ultra'}
                         </div>
                       </button>
                     ))}
+                    <button
+                      onClick={() => setSelectedDuration(-1)}
+                      className={`py-3 rounded-2xl border text-center transition-all cursor-pointer font-mono ${
+                        selectedDuration === -1
+                          ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/10 font-bold'
+                          : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                      }`}
+                    >
+                      <div className="text-sm">Custom</div>
+                      <div className="text-[10px] text-zinc-500 font-sans mt-0.5">
+                        Any mins
+                      </div>
+                    </button>
                   </div>
+
+                  {selectedDuration === -1 && (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/40 flex items-center gap-3">
+                      <span className="text-xs text-zinc-300 font-medium">Custom Minutes:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="720"
+                        value={customMinutes}
+                        onChange={(e) => setCustomMinutes(e.target.value)}
+                        placeholder="e.g. 100"
+                        className="w-24 bg-zinc-950 border border-cyan-500/50 rounded-xl px-3 py-1.5 text-center font-mono font-bold text-cyan-300 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                      />
+                      <span className="text-xs text-zinc-400">
+                        {parseInt(customMinutes) > 0 ? `${customMinutes} minutes (${Math.floor((parseInt(customMinutes) || 0) / 60)}h ${(parseInt(customMinutes) || 0) % 60}m)` : 'Enter any duration (e.g. 100)'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Session Goal / Commitment */}
@@ -665,7 +696,7 @@ export function App() {
                   className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-zinc-950 font-extrabold text-sm tracking-wide shadow-xl shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                 >
                   <Lock className="w-4 h-4" />
-                  <span>ACTIVATE WIRELESS PHONE LOCKDOWN</span>
+                  <span>ACTIVATE WIRELESS PHONE LOCKDOWN ({selectedDuration === -1 ? (parseInt(customMinutes) || 45) : selectedDuration}m)</span>
                 </button>
               </div>
             )}

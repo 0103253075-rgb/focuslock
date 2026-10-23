@@ -32,6 +32,8 @@ class MainActivity : Activity() {
     private var btn25: Button? = null
     private var btn45: Button? = null
     private var btn60: Button? = null
+    private var btnCustom: Button? = null
+    private var customMinutesInput: EditText? = null
     private var startLockdownButton: Button? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -191,15 +193,43 @@ class MainActivity : Activity() {
             }
 
             val b25 = createDurationButton("25m\nPomodoro", 25)
-            val b45 = createDurationButton("45m\nDeep Work", 45)
+            val b45 = createDurationButton("45m\nDeep", 45)
             val b60 = createDurationButton("60m\nUltra", 60)
+            val bCustom = createDurationButton("Custom\nMins", -1)
             btn25 = b25
             btn45 = b45
             btn60 = b60
+            btnCustom = bCustom
 
             durationRow.addView(b25)
             durationRow.addView(b45)
             durationRow.addView(b60)
+            durationRow.addView(bCustom)
+
+            val customInput = EditText(this).apply {
+                hint = "Enter Custom Minutes (e.g. 100)"
+                setText("100")
+                setHintTextColor(Color.parseColor("#52525b"))
+                setTextColor(Color.parseColor("#00F0FF"))
+                textSize = 14f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                setBackgroundColor(Color.parseColor("#18181b"))
+                setPadding(16, 20, 16, 20)
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                visibility = android.view.View.GONE
+                addTextChangedListener(object : android.text.TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+                        val m = s?.toString()?.toIntOrNull() ?: 100
+                        if (selectedDuration == -1) {
+                            startLockdownButton?.text = "⚡ START FOCUS LOCKDOWN (${m}m)"
+                        }
+                    }
+                    override fun afterTextChanged(s: android.text.Editable?) {}
+                })
+            }
+            customMinutesInput = customInput
 
             val startBtn = Button(this).apply {
                 text = "⚡ START FOCUS LOCKDOWN (45m)"
@@ -216,6 +246,7 @@ class MainActivity : Activity() {
 
             root.addView(durationTitle)
             root.addView(durationRow)
+            root.addView(customInput, marginParams)
             root.addView(startBtn, marginParams)
             selectDuration(45)
         } else {
@@ -392,7 +423,17 @@ class MainActivity : Activity() {
         btn60?.setBackgroundColor(if (mins == 60) activeBg else inactiveBg)
         btn60?.setTextColor(if (mins == 60) activeText else inactiveText)
 
-        startLockdownButton?.text = "⚡ START FOCUS LOCKDOWN (${mins}m)"
+        btnCustom?.setBackgroundColor(if (mins == -1) activeBg else inactiveBg)
+        btnCustom?.setTextColor(if (mins == -1) activeText else inactiveText)
+
+        if (mins == -1) {
+            customMinutesInput?.visibility = android.view.View.VISIBLE
+            val customVal = customMinutesInput?.text?.toString()?.toIntOrNull() ?: 100
+            startLockdownButton?.text = "⚡ START FOCUS LOCKDOWN (${customVal}m)"
+        } else {
+            customMinutesInput?.visibility = android.view.View.GONE
+            startLockdownButton?.text = "⚡ START FOCUS LOCKDOWN (${mins}m)"
+        }
     }
 
     private fun startStandaloneLockdown() {
@@ -406,12 +447,19 @@ class MainActivity : Activity() {
             return
         }
 
+        val effectiveDuration = if (selectedDuration == -1) {
+            val entered = customMinutesInput?.text?.toString()?.toIntOrNull() ?: 100
+            Math.max(1, entered)
+        } else {
+            selectedDuration
+        }
+
         val lockIntent = Intent(this, LockOverlayService::class.java).apply {
-            putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, selectedDuration)
+            putExtra(LockOverlayService.EXTRA_DURATION_MINUTES, effectiveDuration)
             putExtra(LockOverlayService.EXTRA_REASON, "Follower Focus")
         }
         startService(lockIntent)
-        Toast.makeText(this, "Lockdown started for ${selectedDuration} min! Stay disciplined.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Lockdown started for ${effectiveDuration} min! Stay disciplined.", Toast.LENGTH_SHORT).show()
         moveTaskToBack(true)
     }
 

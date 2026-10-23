@@ -63,13 +63,13 @@ jobs:
       - name: Publish Direct Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.5
-          name: "FocusLock v1.2.5 (Configured for Live Render Cloud)"
+          tag_name: v1.2.6
+          name: "FocusLock v1.2.6 (Custom Duration Block & Unlimited Timer)"
           body: |
-            ### 🚀 FocusLock v1.2.5 Release:
-            - **Default Cloud Host Configured:** Automatically connects to your live Render server `focuslock-7pe7.onrender.com`.
-            - **Zero Setup for Followers:** Followers only need to enter their 4-digit code (`5091`)!
-            - **Creator Pro & Follower Editions:** Ready to download.
+            ### 🚀 FocusLock v1.2.6 Release:
+            - **Custom Duration Block:** Select any lock duration beyond 90m (e.g. 100m, 120m, 180m, or any custom minutes).
+            - **Pre-Baked Live Cloud Host:** Automatically connected to `focuslock-7pe7.onrender.com`.
+            - **Available on both Laptop Studio Cockpit and Phone App.**
           files: |
             release_apks/FocusLock-Follower-Edition.apk
             release_apks/FocusLock-Creator-Pro.apk
