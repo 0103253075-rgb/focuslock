@@ -339,6 +339,7 @@ class MainActivity : Activity() {
         }
         startService(lockIntent)
         Toast.makeText(this, "Lockdown started for ${selectedDuration} min! Stay disciplined.", Toast.LENGTH_SHORT).show()
+        moveTaskToBack(true)
     }
 
     override fun onResume() {

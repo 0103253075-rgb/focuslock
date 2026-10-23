@@ -35,6 +35,7 @@ class LockOverlayService : Service() {
     // 5-Tap Tracking
     private var tapCount = 0
     private var lastTapTime = 0L
+    private var keypadOpenTime = 0L
 
     // In-overlay PIN state
     private var enteredPin: String = ""
@@ -58,8 +59,10 @@ class LockOverlayService : Service() {
         fun dismissNow() {
             android.os.Handler(Looper.getMainLooper()).post {
                 try {
-                    currentInstance?.removeOverlay()
-                    currentInstance?.stopSelf()
+                    val inst = currentInstance
+                    inst?.removeOverlay()
+                    inst?.stopSelf()
+                    inst?.goToHomeScreen()
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -148,9 +151,11 @@ class LockOverlayService : Service() {
                         if (tapCount >= 5) {
                             tapCount = 0
                             enteredPin = ""
+                            keypadOpenTime = System.currentTimeMillis()
                             updatePinDisplay()
                             normalLockLayout?.visibility = View.GONE
                             pinPadLayout?.visibility = View.VISIBLE
+                            return true // Consume 5th tap so it cannot accidentally click a keypad button
                         }
                     }
                 }
@@ -334,8 +339,13 @@ class LockOverlayService : Service() {
                         setMargins(8, 0, 8, 0)
                     }
                     setOnClickListener {
+                        if (System.currentTimeMillis() - keypadOpenTime < 350) {
+                            return@setOnClickListener
+                        }
                         when (btnText) {
                             "BACK" -> {
+                                enteredPin = ""
+                                updatePinDisplay()
                                 pinPadLayout?.visibility = View.GONE
                                 normalLockLayout?.visibility = View.VISIBLE
                             }
@@ -347,7 +357,7 @@ class LockOverlayService : Service() {
                             }
                             else -> {
                                 if (enteredPin.length < 6) {
-                                    enteredPin += btnText
+                                    enteredPin += btnText.trim()
                                     updatePinDisplay()
                                     if (enteredPin.length == 6) {
                                         checkPinAndUnlock()
@@ -372,6 +382,9 @@ class LockOverlayService : Service() {
                 setMargins(0, 15, 0, 0)
             }
             setOnClickListener {
+                if (System.currentTimeMillis() - keypadOpenTime < 350) {
+                    return@setOnClickListener
+                }
                 checkPinAndUnlock()
             }
         }
@@ -404,20 +417,34 @@ class LockOverlayService : Service() {
         val len = enteredPin.length
         val sb = StringBuilder()
         for (i in 0 until 6) {
-            if (i < len) sb.append("• ")
+            if (i < len) sb.append(enteredPin[i]).append(" ")
             else sb.append("_ ")
         }
         pinDotsText?.text = sb.toString().trim()
     }
 
     private fun checkPinAndUnlock() {
-        if (enteredPin == MASTER_PIN) {
+        if (enteredPin.trim() == MASTER_PIN.trim()) {
             Toast.makeText(this, "🔑 Master PIN Verified. Unlocking phone!", Toast.LENGTH_SHORT).show()
-            dismissNow()
+            removeOverlay()
+            stopSelf()
+            goToHomeScreen()
         } else {
-            Toast.makeText(this, "Incorrect PIN! Try 884422", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Incorrect PIN ($enteredPin)! Try 884422", Toast.LENGTH_SHORT).show()
             enteredPin = ""
             updatePinDisplay()
+        }
+    }
+
+    private fun goToHomeScreen() {
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(homeIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
