@@ -11,8 +11,29 @@ android {
         applicationId = "com.focuslock"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.2"
+        manifestPlaceholders["appLabel"] = "FocusLock"
+    }
+
+    flavorDimensions += "edition"
+    productFlavors {
+        create("follower") {
+            dimension = "edition"
+            applicationId = "com.focuslock.follower"
+            versionNameSuffix = "-follower"
+            manifestPlaceholders["appLabel"] = "FocusLock"
+        }
+        create("creator") {
+            dimension = "edition"
+            applicationId = "com.focuslock"
+            versionNameSuffix = "-creator"
+            manifestPlaceholders["appLabel"] = "FocusLock Pro"
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

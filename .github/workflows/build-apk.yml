@@ -26,7 +26,7 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Build Debug APK
+      - name: Build Debug APKs
         working-directory: ./android
         run: |
           set +e
@@ -42,18 +42,32 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Artifact
+      - name: Prepare APKs for Distribution
+        run: |
+          mkdir -p release_apks
+          cp android/app/build/outputs/apk/follower/debug/app-follower-debug.apk release_apks/FocusLock-Follower-Edition.apk
+          cp android/app/build/outputs/apk/creator/debug/app-creator-debug.apk release_apks/FocusLock-Creator-Pro.apk
+
+      - name: Upload Follower Edition Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FocusLock-Debug-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: FocusLock-Follower-Edition
+          path: release_apks/FocusLock-Follower-Edition.apk
+
+      - name: Upload Creator Edition Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusLock-Creator-Pro
+          path: release_apks/FocusLock-Creator-Pro.apk
 
       - name: Publish Direct Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.0
-          name: "FocusLock v1.1.0 (Direct APK)"
-          body: "Approved UI update with discipline quote, global 5-tap interceptor, and 0ms instant dismiss."
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          tag_name: v1.2.0
+          name: "FocusLock v1.2.0 (Follower & Creator Editions)"
+          body: "Direct 1-tap download for both Follower (Standalone) and Creator (Remote Sync) editions."
+          files: |
+            release_apks/FocusLock-Follower-Edition.apk
+            release_apks/FocusLock-Creator-Pro.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
