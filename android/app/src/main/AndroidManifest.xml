@@ -23,6 +23,7 @@
         android:allowBackup="true"
         android:icon="@android:drawable/ic_lock_lock"
         android:label="FocusLock"
+        android:usesCleartextTraffic="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.FocusLock">
 

@@ -28,20 +28,10 @@ jobs:
 
       - name: Build Debug APK
         working-directory: ./android
-        run: |
-          gradle assembleDebug --stacktrace > build.log 2>&1 || true
-
-      - name: Save Log
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add android/build.log
-          git commit -m "chore: save build log" || true
-          git push || true
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: FocusLock-Debug-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk

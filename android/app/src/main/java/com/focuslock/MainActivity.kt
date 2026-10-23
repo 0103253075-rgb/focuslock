@@ -76,7 +76,8 @@ class MainActivity : Activity() {
 
         // Input: Laptop IP Address
         ipInput = EditText(this).apply {
-            hint = "Laptop IP (e.g. 192.168.137.1)"
+            hint = "192.168.29.197 or leave blank"
+            setText("192.168.29.197")
             setHintTextColor(Color.parseColor("#52525b"))
             setTextColor(Color.WHITE)
             textSize = 14f

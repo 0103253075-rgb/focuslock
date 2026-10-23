@@ -46,7 +46,7 @@ class FocusSyncService : Service() {
     }
 
     private var client: OkHttpClient? = null
-    private var serverUrl: String = "ws://192.168.137.1:4000"
+    private var serverUrl: String = "wss://catalogs-alex-voted-invision.trycloudflare.com"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -58,9 +58,20 @@ class FocusSyncService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val customIp = intent?.getStringExtra("server_ip")
+        val customIp = intent?.getStringExtra("server_ip")?.trim()
         if (!customIp.isNullOrEmpty()) {
-            serverUrl = "ws://$customIp:4000"
+            var formatted = customIp
+            if (formatted.startsWith("http://")) formatted = formatted.replace("http://", "ws://")
+            else if (formatted.startsWith("https://")) formatted = formatted.replace("https://", "wss://")
+            else if (!formatted.startsWith("ws://") && !formatted.startsWith("wss://")) {
+                if (formatted.contains("trycloudflare.com")) {
+                    formatted = "wss://$formatted"
+                } else {
+                    formatted = if (formatted.contains(":")) "ws://$formatted" else "ws://$formatted:4000"
+                }
+            }
+            serverUrl = formatted
+            Log.i(TAG, "Configured serverUrl: $serverUrl")
             connectWebSocket()
         }
         return START_STICKY
@@ -75,12 +86,18 @@ class FocusSyncService : Service() {
 
     private fun connectWebSocket() {
         try {
+            activeWebSocket?.close(1000, "Reconnecting")
+            activeWebSocket = null
+
             val request = Request.Builder().url(serverUrl).build()
             client?.newWebSocket(request, object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     Log.i(TAG, "Connected to Laptop Sync Server at $serverUrl")
                     activeWebSocket = webSocket
                     sendHeartbeat(webSocket)
+                    android.os.Handler(mainLooper).post {
+                        android.widget.Toast.makeText(applicationContext, "🟢 Connected to Laptop FocusLock!", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -92,7 +109,7 @@ class FocusSyncService : Service() {
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    Log.w(TAG, "Sync server disconnected, retrying in 4s...")
+                    Log.w(TAG, "Sync server disconnected: ${t.message}, retrying in 4s...")
                     activeWebSocket = null
                     // Reconnect in 4 seconds
                     android.os.Handler(mainLooper).postDelayed({ connectWebSocket() }, 4000)
