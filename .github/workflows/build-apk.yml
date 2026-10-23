@@ -30,13 +30,13 @@ jobs:
         working-directory: ./android
         run: |
           set +e
-          gradle assembleDebug --stacktrace 2>&1 | tee ../build.log
+          gradle assembleDebug --stacktrace 2>&1 | tee ../build_error.txt
           BUILD_STATUS=${PIPESTATUS[0]}
           if [ $BUILD_STATUS -ne 0 ]; then
             git config --global user.name "Build Bot"
             git config --global user.email "bot@github.com"
             git checkout -B build-error-log
-            git add ../build.log
+            git add -f ../build_error.txt
             git commit -m "Capture build error log"
             git push origin build-error-log --force
             exit 1
